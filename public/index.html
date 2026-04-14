@@ -404,9 +404,9 @@
         <div class="table-wrap">
           <table><thead><tr>
             <th>Cliente</th><th>Tipo</th><th>Valor</th><th>Parceiro</th>
-            <th>% Parceiro</th><th>R$ Parceiro</th><th>% Bitribut</th><th>R$ Bitribut</th><th>Total</th><th>Status</th>
+            <th>% Parceiro</th><th>R$ Parceiro</th><th>% AGC</th><th>R$ AGC</th><th>% Inst.</th><th>R$ Inst.</th><th>Total Bitribut</th><th>Status</th>
           </tr></thead>
-          <tbody id="comissoes-tbody"><tr><td colspan="10" class="no-data">Carregando...</td></tr></tbody></table>
+          <tbody id="comissoes-tbody"><tr><td colspan="12" class="no-data">Carregando...</td></tr></tbody></table>
         </div>
       </div>
     </div>
@@ -474,12 +474,15 @@
           </div>
           <div class="form-group"></div>
           <div class="form-group"><label>% Comissão Parceiro</label><input type="number" id="p-partnerComm" min="0" max="100" step="0.01" value="0" oninput="updateCommissionPreview()"></div>
-          <div class="form-group"><label>% Comissão Bitribut <span style="font-size:.75rem;color:var(--success);font-weight:600">(paga pela instituição)</span></label><input type="number" id="p-bitributComm" min="0" max="100" step="0.01" value="0" oninput="updateCommissionPreview()"></div>
-          <div class="commission-preview" id="comm-preview">
+          <div class="form-group"><label>% Comissão AGC (Bitribut)</label><input type="number" id="p-bitributComm" min="0" max="100" step="0.01" value="0" oninput="updateCommissionPreview()"></div>
+          <div class="form-group"><label>% Comissão Instituição <span style="font-size:.75rem;color:var(--success);font-weight:600">(auto-preenchido)</span></label><input type="number" id="p-instComm" min="0" max="100" step="0.01" value="0" oninput="updateCommissionPreview()"></div>
+          <div class="form-group"></div>
+          <div class="commission-preview" id="comm-preview" style="grid-column:1/-1">
             <div class="cp-item"><span class="cp-label">Valor do Empréstimo</span><span class="cp-value" id="prev-loan">R$ 0,00</span></div>
             <div class="cp-item"><span class="cp-label">💰 Parceiro</span><span class="cp-value orange" id="prev-partner">R$ 0,00</span></div>
-            <div class="cp-item"><span class="cp-label">🏢 Bitribut</span><span class="cp-value green" id="prev-bitribut">R$ 0,00</span></div>
-            <div class="cp-item"><span class="cp-label">📊 Total</span><span class="cp-value" id="prev-total">R$ 0,00</span></div>
+            <div class="cp-item"><span class="cp-label">🏢 AGC (Bitribut)</span><span class="cp-value green" id="prev-bitribut">R$ 0,00</span></div>
+            <div class="cp-item"><span class="cp-label">🏦 Instituição</span><span class="cp-value green" id="prev-inst">R$ 0,00</span></div>
+            <div class="cp-item" style="border-top:2px solid var(--primary);margin-top:4px;padding-top:8px"><span class="cp-label" style="font-weight:800;color:var(--primary)">📊 Total Bitribut</span><span class="cp-value" id="prev-total" style="color:var(--primary);font-weight:800">R$ 0,00</span></div>
           </div>
           <div class="section-divider">📝 Observações</div>
           <div class="form-group full"><label>Notas</label><textarea id="p-notes"></textarea></div>
@@ -726,7 +729,7 @@ async function initApp() {
 async function loadData() {
   try {
     const [p, par, inst] = await Promise.all([API.get('/api/propostas'), API.get('/api/parceiros'), API.get('/api/instituicoes')]);
-    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, totalCommValue: x.total_comm_value, notes: x.notes, createdAt: x.created_at }));
+    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdAt: x.created_at }));
     CACHE.parceiros = par.map(x => ({ ...x, defaultComm: x.default_comm, createdAt: x.created_at }));
     CACHE.instituicoes = inst.map(x => ({ ...x, commBitribut: x.comm_bitribut, createdAt: x.created_at }));
   } catch(e) { showToast('Erro ao carregar dados: ' + e.message, 'error'); }
@@ -782,6 +785,7 @@ function openNewProposta() {
   document.getElementById('p-id').value = '';
   document.getElementById('p-partnerComm').value = 0;
   document.getElementById('p-bitributComm').value = 0;
+  document.getElementById('p-instComm').value = 0;
   populateParceiroSelectInForm();
   populateInstituicaoSelectInForm();
   updateCommissionPreview();
@@ -805,6 +809,7 @@ function editProposta(id) {
   document.getElementById('p-partnerId').value = p.partnerId || '';
   document.getElementById('p-partnerComm').value = p.partnerComm || 0;
   document.getElementById('p-bitributComm').value = p.bitributComm || 0;
+  document.getElementById('p-instComm').value = p.instComm || 0;
   document.getElementById('p-notes').value = p.notes || '';
   document.getElementById('p-id').value = p.id;
   updateCommissionPreview();
@@ -816,6 +821,7 @@ async function saveProposta(e) {
   const lv = parseFloat(document.getElementById('p-loanValue').value) || 0;
   const pc = parseFloat(document.getElementById('p-partnerComm').value) || 0;
   const bc = parseFloat(document.getElementById('p-bitributComm').value) || 0;
+  const ic = parseFloat(document.getElementById('p-instComm').value) || 0;
   const body = {
     clientName: document.getElementById('p-clientName').value.trim(),
     clientCpfCnpj: document.getElementById('p-clientCpfCnpj').value.trim(),
@@ -826,8 +832,9 @@ async function saveProposta(e) {
     institution: (CACHE.instituicoes.find(x=>x.id===document.getElementById('p-institution').value)||{name:''}).name,
     loanValue: lv, status: document.getElementById('p-status').value,
     partnerId: document.getElementById('p-partnerId').value,
-    partnerComm: pc, bitributComm: bc,
-    partnerCommValue: pct(lv,pc), bitributCommValue: pct(lv,bc), totalCommValue: pct(lv,pc)+pct(lv,bc),
+    partnerComm: pc, bitributComm: bc, instComm: ic,
+    partnerCommValue: pct(lv,pc), bitributCommValue: pct(lv,bc), instCommValue: pct(lv,ic),
+    totalCommValue: pct(lv,pc)+pct(lv,bc)+pct(lv,ic),
     notes: document.getElementById('p-notes').value.trim(),
   };
   const id = document.getElementById('p-id').value;
@@ -870,8 +877,9 @@ function viewProposta(id) {
     </div>
     <div style="display:flex;gap:16px;background:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:18px;flex-wrap:wrap">
       <div><div style="font-size:.7rem;color:var(--text-muted);font-weight:700;text-transform:uppercase">Comissão Parceiro</div><div style="font-size:1.05rem;font-weight:800;color:var(--accent-dark)">${fmt(p.partnerCommValue)} (${p.partnerComm}%)</div></div>
-      <div><div style="font-size:.7rem;color:var(--text-muted);font-weight:700;text-transform:uppercase">Comissão Bitribut</div><div style="font-size:1.05rem;font-weight:800;color:var(--success)">${fmt(p.bitributCommValue)} (${p.bitributComm}%)</div></div>
-      <div><div style="font-size:.7rem;color:var(--text-muted);font-weight:700;text-transform:uppercase">Total</div><div style="font-size:1.05rem;font-weight:800;color:var(--primary)">${fmt(p.totalCommValue)}</div></div>
+      <div><div style="font-size:.7rem;color:var(--text-muted);font-weight:700;text-transform:uppercase">Comissão AGC</div><div style="font-size:1.05rem;font-weight:800;color:var(--success)">${fmt(p.bitributCommValue)} (${p.bitributComm}%)</div></div>
+      <div><div style="font-size:.7rem;color:var(--text-muted);font-weight:700;text-transform:uppercase">Comissão Instituição</div><div style="font-size:1.05rem;font-weight:800;color:#0099cc">${fmt(p.instCommValue||0)} (${p.instComm||0}%)</div></div>
+      <div><div style="font-size:.7rem;color:var(--text-muted);font-weight:700;text-transform:uppercase">Total Bitribut</div><div style="font-size:1.15rem;font-weight:800;color:var(--primary)">${fmt(parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0))}</div></div>
     </div>
     ${p.notes?`<div style="margin-bottom:18px"><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:5px">Observações</div><div style="background:var(--bg);padding:10px 12px;border-radius:7px;font-size:.875rem">${p.notes}</div></div>`:''}
     <div><div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">🔀 Linha do Tempo</div><div class="timeline">${tl}</div></div>`;
@@ -883,10 +891,12 @@ function updateCommissionPreview() {
   const v = parseFloat(document.getElementById('p-loanValue').value)||0;
   const pc = parseFloat(document.getElementById('p-partnerComm').value)||0;
   const bc = parseFloat(document.getElementById('p-bitributComm').value)||0;
+  const ic = parseFloat(document.getElementById('p-instComm').value)||0;
   document.getElementById('prev-loan').textContent = fmt(v);
   document.getElementById('prev-partner').textContent = fmt(pct(v,pc));
   document.getElementById('prev-bitribut').textContent = fmt(pct(v,bc));
-  document.getElementById('prev-total').textContent = fmt(pct(v,pc)+pct(v,bc));
+  document.getElementById('prev-inst').textContent = fmt(pct(v,ic));
+  document.getElementById('prev-total').textContent = fmt(pct(v,bc)+pct(v,ic));
 }
 
 function populateParceiroSelectInForm() {
@@ -919,9 +929,9 @@ function populateInstituicaoSelectInForm() {
 
 function autoFillInstitutionCommission() {
   const iid = document.getElementById('p-institution').value;
-  if(!iid) { document.getElementById('p-bitributComm').value=0; updateCommissionPreview(); return; }
+  if(!iid) { document.getElementById('p-instComm').value=0; updateCommissionPreview(); return; }
   const inst = CACHE.instituicoes.find(x=>x.id===iid);
-  if(inst) { document.getElementById('p-bitributComm').value = inst.commBitribut; updateCommissionPreview(); }
+  if(inst) { document.getElementById('p-instComm').value = inst.commBitribut; updateCommissionPreview(); }
 }
 
 function renderInstituicoesTable() {
@@ -1177,7 +1187,7 @@ function renderDashboard() {
   const all = CACHE.propostas;
   const ativas = all.filter(p=>p.status!=='Cancelado');
   const totalVol = ativas.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
-  const totBitribut = ativas.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0),0);
+  const totBitribut = ativas.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0),0);
   const totParceiro = ativas.reduce((a,p)=>a+parseFloat(p.partnerCommValue||0),0);
   const liberados = all.filter(p=>p.status==='Liberado'||p.status==='Concluído');
   const volLib = liberados.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
@@ -1233,20 +1243,23 @@ function renderComissoes() {
     if(fParceiro && p.partnerId!==fParceiro) return false;
     return p.status!=='Cancelado';
   });
-  const totB = list.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0),0);
+  const totBagc = list.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0),0);
+  const totBinst = list.reduce((a,p)=>a+parseFloat(p.instCommValue||0),0);
+  const totB = totBagc + totBinst;
   const totP = list.reduce((a,p)=>a+parseFloat(p.partnerCommValue||0),0);
   const totV = list.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
-  const libB = list.filter(p=>p.status==='Liberado'||p.status==='Concluído').reduce((a,p)=>a+parseFloat(p.bitributCommValue||0),0);
+  const libB = list.filter(p=>p.status==='Liberado'||p.status==='Concluído').reduce((a,p)=>a+parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0),0);
   document.getElementById('kpi-comissoes').innerHTML = `
-    <div class="kpi-card purple" style="border-left-width:6px"><div class="kpi-label">Receita Total Bitribut</div><div class="kpi-value" style="font-size:1.35rem">${fmt(totB+totP)}</div><div class="kpi-sub">Instituição + Executivos</div></div>
-    <div class="kpi-card green"><div class="kpi-label">Comissão Instituição (Bitribut)</div><div class="kpi-value" style="font-size:1.2rem">${fmt(totB)}</div><div class="kpi-sub">${fmt(libB)} já liberado</div></div>
-    <div class="kpi-card orange"><div class="kpi-label">Comissão Executivos (Repassar)</div><div class="kpi-value" style="font-size:1.2rem">${fmt(totP)}</div></div>
-    <div class="kpi-card blue"><div class="kpi-label">Volume em Carteira</div><div class="kpi-value" style="font-size:1.2rem">${fmt(totV)}</div><div class="kpi-sub">${list.length} propostas</div></div>`;
+    <div class="kpi-card purple" style="border-left-width:6px"><div class="kpi-label">Comissão Bitribut (Total)</div><div class="kpi-value" style="font-size:1.35rem">${fmt(totB)}</div><div class="kpi-sub">AGC ${fmt(totBagc)} + Instituição ${fmt(totBinst)}</div></div>
+    <div class="kpi-card green"><div class="kpi-label">Comissão AGC (Bitribut)</div><div class="kpi-value" style="font-size:1.2rem">${fmt(totBagc)}</div><div class="kpi-sub">${fmt(libB)} já liberado</div></div>
+    <div class="kpi-card blue"><div class="kpi-label">Comissão Instituição</div><div class="kpi-value" style="font-size:1.2rem">${fmt(totBinst)}</div></div>
+    <div class="kpi-card orange"><div class="kpi-label">Comissão Executivos (Repassar)</div><div class="kpi-value" style="font-size:1.2rem">${fmt(totP)}</div></div>`;
   const tbody = document.getElementById('comissoes-tbody');
-  if(!list.length) { tbody.innerHTML='<tr><td colspan="10" class="no-data">Nenhuma comissão para exibir.</td></tr>'; return; }
+  if(!list.length) { tbody.innerHTML='<tr><td colspan="12" class="no-data">Nenhuma comissão para exibir.</td></tr>'; return; }
   tbody.innerHTML = list.map(p => {
     const par = CACHE.parceiros.find(x=>x.id===p.partnerId);
     const bk = STATUS_BADGE[p.status]||'prospeccao';
+    const totalBit = parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0);
     return `<tr>
       <td><strong>${p.clientName}</strong></td><td style="font-size:.78rem">${p.loanType||'—'}</td>
       <td style="font-weight:700">${fmt(p.loanValue)}</td>
@@ -1255,10 +1268,12 @@ function renderComissoes() {
       <td style="color:var(--accent-dark);font-weight:700">${fmt(p.partnerCommValue)}</td>
       <td style="color:var(--success)">${p.bitributComm||0}%</td>
       <td style="color:var(--success);font-weight:700">${fmt(p.bitributCommValue)}</td>
-      <td style="font-weight:800;color:var(--primary)">${fmt(p.totalCommValue)}</td>
+      <td style="color:#0099cc">${p.instComm||0}%</td>
+      <td style="color:#0099cc;font-weight:700">${fmt(p.instCommValue)}</td>
+      <td style="font-weight:800;color:var(--primary)">${fmt(totalBit)}</td>
       <td><span class="badge badge-${bk}">${p.status}</span></td></tr>`;
   }).join('');
-  tbody.innerHTML += `<tr class="summary-row"><td colspan="2" style="font-weight:800">TOTAL</td><td style="font-weight:800">${fmt(totV)}</td><td>—</td><td>—</td><td style="color:var(--accent-dark);font-weight:800">${fmt(totP)}</td><td>—</td><td style="color:var(--success);font-weight:800">${fmt(totB)}</td><td style="font-weight:800;color:var(--primary)">${fmt(totB+totP)}</td><td>—</td></tr>`;
+  tbody.innerHTML += `<tr class="summary-row"><td colspan="2" style="font-weight:800">TOTAL</td><td style="font-weight:800">${fmt(totV)}</td><td>—</td><td>—</td><td style="color:var(--accent-dark);font-weight:800">${fmt(totP)}</td><td>—</td><td style="color:var(--success);font-weight:800">${fmt(totBagc)}</td><td>—</td><td style="color:#0099cc;font-weight:800">${fmt(totBinst)}</td><td style="font-weight:800;color:var(--primary)">${fmt(totB)}</td><td>—</td></tr>`;
 }
 
 // ============================================================

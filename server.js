@@ -67,8 +67,10 @@ db.exec(`
   );
 `);
 
-// Add instituicao_id column to existing databases (safe migration)
+// Add columns to existing databases (safe migrations)
 try { db.exec(`ALTER TABLE propostas ADD COLUMN instituicao_id TEXT DEFAULT ''`); } catch(e) {}
+try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm REAL DEFAULT 0`); } catch(e) {}
+try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm_value REAL DEFAULT 0`); } catch(e) {}
 
 // Create default admin if not exists
 const adminExists = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@bitribut.com.br');
@@ -262,14 +264,14 @@ app.post('/api/propostas', auth, (req, res) => {
   const now = new Date().toISOString();
   db.prepare(`INSERT INTO propostas
     (id,client_name,client_cpfcnpj,client_phone,client_email,loan_type,institution,instituicao_id,
-     loan_value,status,partner_id,partner_comm,bitribut_comm,partner_comm_value,
-     bitribut_comm_value,total_comm_value,notes,created_by,created_at,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+     loan_value,status,partner_id,partner_comm,bitribut_comm,inst_comm,partner_comm_value,
+     bitribut_comm_value,inst_comm_value,total_comm_value,notes,created_by,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(id, p.clientName, p.clientCpfCnpj || '', p.clientPhone || '', p.clientEmail || '',
       p.loanType || '', p.institution || '', p.instituicaoId || '',
       p.loanValue || 0, p.status || 'Prospecção',
-      p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0,
-      p.partnerCommValue || 0, p.bitributCommValue || 0, p.totalCommValue || 0,
+      p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0, p.instComm || 0,
+      p.partnerCommValue || 0, p.bitributCommValue || 0, p.instCommValue || 0, p.totalCommValue || 0,
       p.notes || '', req.user.id, now, now);
   res.json({ id });
 });
@@ -279,13 +281,13 @@ app.put('/api/propostas/:id', auth, (req, res) => {
   const now = new Date().toISOString();
   db.prepare(`UPDATE propostas SET
     client_name=?,client_cpfcnpj=?,client_phone=?,client_email=?,loan_type=?,institution=?,instituicao_id=?,
-    loan_value=?,status=?,partner_id=?,partner_comm=?,bitribut_comm=?,partner_comm_value=?,
-    bitribut_comm_value=?,total_comm_value=?,notes=?,updated_at=? WHERE id=?`)
+    loan_value=?,status=?,partner_id=?,partner_comm=?,bitribut_comm=?,inst_comm=?,partner_comm_value=?,
+    bitribut_comm_value=?,inst_comm_value=?,total_comm_value=?,notes=?,updated_at=? WHERE id=?`)
     .run(p.clientName, p.clientCpfCnpj || '', p.clientPhone || '', p.clientEmail || '',
       p.loanType || '', p.institution || '', p.instituicaoId || '',
       p.loanValue || 0, p.status,
-      p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0,
-      p.partnerCommValue || 0, p.bitributCommValue || 0, p.totalCommValue || 0,
+      p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0, p.instComm || 0,
+      p.partnerCommValue || 0, p.bitributCommValue || 0, p.instCommValue || 0, p.totalCommValue || 0,
       p.notes || '', now, req.params.id);
   res.json({ ok: true });
 });
