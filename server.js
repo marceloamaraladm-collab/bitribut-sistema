@@ -36,6 +36,13 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS instituicoes (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    comm_bitribut REAL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS propostas (
     id TEXT PRIMARY KEY,
     client_name TEXT NOT NULL,
@@ -44,6 +51,7 @@ db.exec(`
     client_email TEXT DEFAULT '',
     loan_type TEXT DEFAULT '',
     institution TEXT DEFAULT '',
+    instituicao_id TEXT DEFAULT '',
     loan_value REAL DEFAULT 0,
     status TEXT DEFAULT 'Prospecção',
     partner_id TEXT DEFAULT '',
@@ -58,6 +66,9 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 `);
+
+// Add instituicao_id column to existing databases (safe migration)
+try { db.exec(`ALTER TABLE propostas ADD COLUMN instituicao_id TEXT DEFAULT ''`); } catch(e) {}
 
 // Create default admin if not exists
 const adminExists = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@bitribut.com.br');
@@ -211,6 +222,34 @@ app.delete('/api/parceiros/:id', auth, (req, res) => {
 });
 
 // ============================================================
+//  INSTITUICOES
+// ============================================================
+app.get('/api/instituicoes', auth, (req, res) => {
+  res.json(db.prepare('SELECT * FROM instituicoes ORDER BY name').all());
+});
+
+app.post('/api/instituicoes', auth, (req, res) => {
+  const { name, commBitribut } = req.body;
+  if (!name) return res.status(400).json({ error: 'Nome é obrigatório' });
+  const id = uid();
+  db.prepare('INSERT INTO instituicoes (id, name, comm_bitribut) VALUES (?,?,?)')
+    .run(id, name, commBitribut || 0);
+  res.json({ id, name, comm_bitribut: commBitribut || 0 });
+});
+
+app.put('/api/instituicoes/:id', auth, (req, res) => {
+  const { name, commBitribut } = req.body;
+  db.prepare('UPDATE instituicoes SET name=?, comm_bitribut=? WHERE id=?')
+    .run(name, commBitribut || 0, req.params.id);
+  res.json({ ok: true });
+});
+
+app.delete('/api/instituicoes/:id', auth, (req, res) => {
+  db.prepare('DELETE FROM instituicoes WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ============================================================
 //  PROPOSTAS
 // ============================================================
 app.get('/api/propostas', auth, (req, res) => {
@@ -222,12 +261,13 @@ app.post('/api/propostas', auth, (req, res) => {
   const id = uid();
   const now = new Date().toISOString();
   db.prepare(`INSERT INTO propostas
-    (id,client_name,client_cpfcnpj,client_phone,client_email,loan_type,institution,
+    (id,client_name,client_cpfcnpj,client_phone,client_email,loan_type,institution,instituicao_id,
      loan_value,status,partner_id,partner_comm,bitribut_comm,partner_comm_value,
      bitribut_comm_value,total_comm_value,notes,created_by,created_at,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(id, p.clientName, p.clientCpfCnpj || '', p.clientPhone || '', p.clientEmail || '',
-      p.loanType || '', p.institution || '', p.loanValue || 0, p.status || 'Prospecção',
+      p.loanType || '', p.institution || '', p.instituicaoId || '',
+      p.loanValue || 0, p.status || 'Prospecção',
       p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0,
       p.partnerCommValue || 0, p.bitributCommValue || 0, p.totalCommValue || 0,
       p.notes || '', req.user.id, now, now);
@@ -238,11 +278,12 @@ app.put('/api/propostas/:id', auth, (req, res) => {
   const p = req.body;
   const now = new Date().toISOString();
   db.prepare(`UPDATE propostas SET
-    client_name=?,client_cpfcnpj=?,client_phone=?,client_email=?,loan_type=?,institution=?,
+    client_name=?,client_cpfcnpj=?,client_phone=?,client_email=?,loan_type=?,institution=?,instituicao_id=?,
     loan_value=?,status=?,partner_id=?,partner_comm=?,bitribut_comm=?,partner_comm_value=?,
     bitribut_comm_value=?,total_comm_value=?,notes=?,updated_at=? WHERE id=?`)
     .run(p.clientName, p.clientCpfCnpj || '', p.clientPhone || '', p.clientEmail || '',
-      p.loanType || '', p.institution || '', p.loanValue || 0, p.status,
+      p.loanType || '', p.institution || '', p.instituicaoId || '',
+      p.loanValue || 0, p.status,
       p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0,
       p.partnerCommValue || 0, p.bitributCommValue || 0, p.totalCommValue || 0,
       p.notes || '', now, req.params.id);

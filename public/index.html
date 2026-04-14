@@ -266,6 +266,9 @@
     <a onclick="showView('parceiros')" data-view="parceiros">
       <span class="icon">🤝</span><span>Parceiros</span>
     </a>
+    <a onclick="showView('instituicoes')" data-view="instituicoes">
+      <span class="icon">🏦</span><span>Instituições</span>
+    </a>
     <a onclick="showView('comissoes')" data-view="comissoes">
       <span class="icon">💰</span><span>Comissões</span>
     </a>
@@ -366,6 +369,22 @@
       </div>
     </div>
 
+    <!-- INSTITUICOES -->
+    <div class="view" id="view-instituicoes">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>🏦 Instituições Financeiras</h3>
+          <button class="btn btn-accent btn-sm" onclick="openNewInstituicao()">＋ Nova Instituição</button>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr>
+            <th>Nome</th><th>% Comissão Bitribut</th><th>Propostas</th><th>Volume Total</th><th>Comissões Geradas</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="instituicoes-tbody"><tr><td colspan="6" class="no-data">Carregando...</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+
     <!-- COMISSOES -->
     <div class="view" id="view-comissoes">
       <div class="kpi-grid" id="kpi-comissoes"></div>
@@ -434,7 +453,11 @@
               <option>Antecipação de Recebíveis</option><option>BNDES/Fomento</option><option>Outro</option>
             </select>
           </div>
-          <div class="form-group"><label>Instituição Financeira</label><input type="text" id="p-institution"></div>
+          <div class="form-group"><label>Instituição Financeira</label>
+            <select id="p-institution" onchange="autoFillInstitutionCommission()">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
           <div class="form-group"><label>Valor Solicitado (R$) *</label><input type="number" id="p-loanValue" required min="0" step="0.01" oninput="updateCommissionPreview()"></div>
           <div class="form-group"><label>Status *</label>
             <select id="p-status" required>
@@ -493,6 +516,29 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-parceiro')">Cancelar</button>
       <button class="btn btn-accent" onclick="document.getElementById('form-parceiro').requestSubmit()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INSTITUICAO -->
+<div class="modal-overlay" id="modal-instituicao">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h2 id="modal-instituicao-title">Nova Instituição</h2>
+      <button class="close-btn" onclick="closeModal('modal-instituicao')">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-instituicao" onsubmit="saveInstituicao(event)">
+        <div class="form-grid">
+          <div class="form-group full"><label>Nome da Instituição *</label><input type="text" id="inst-name" required></div>
+          <div class="form-group full"><label>% Comissão Bitribut (paga pela instituição)</label><input type="number" id="inst-comm" min="0" max="100" step="0.01" value="0"></div>
+          <input type="hidden" id="inst-id">
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-instituicao')">Cancelar</button>
+      <button class="btn btn-accent" onclick="document.getElementById('form-instituicao').requestSubmit()">💾 Salvar</button>
     </div>
   </div>
 </div>
@@ -575,7 +621,7 @@
 //  STATE
 // ============================================================
 let SESSION = { token: localStorage.getItem('bt_token'), user: JSON.parse(localStorage.getItem('bt_user') || 'null') };
-let CACHE = { propostas: [], parceiros: [] };
+let CACHE = { propostas: [], parceiros: [], instituicoes: [] };
 
 const STATUS_BADGE = {
   'Prospecção':'prospeccao','Documentação':'documentacao','Análise de Crédito':'analise',
@@ -679,16 +725,17 @@ async function initApp() {
 
 async function loadData() {
   try {
-    const [p, par] = await Promise.all([API.get('/api/propostas'), API.get('/api/parceiros')]);
-    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, totalCommValue: x.total_comm_value, notes: x.notes, createdAt: x.created_at }));
+    const [p, par, inst] = await Promise.all([API.get('/api/propostas'), API.get('/api/parceiros'), API.get('/api/instituicoes')]);
+    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, totalCommValue: x.total_comm_value, notes: x.notes, createdAt: x.created_at }));
     CACHE.parceiros = par.map(x => ({ ...x, defaultComm: x.default_comm, createdAt: x.created_at }));
+    CACHE.instituicoes = inst.map(x => ({ ...x, commBitribut: x.comm_bitribut, createdAt: x.created_at }));
   } catch(e) { showToast('Erro ao carregar dados: ' + e.message, 'error'); }
 }
 
 // ============================================================
 //  NAVIGATION
 // ============================================================
-const TITLES = { dashboard:'Dashboard', propostas:'Propostas', parceiros:'Parceiros', comissoes:'Comissões', usuarios:'Usuários' };
+const TITLES = { dashboard:'Dashboard', propostas:'Propostas', parceiros:'Parceiros', instituicoes:'Instituições', comissoes:'Comissões', usuarios:'Usuários' };
 
 function showView(v) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
@@ -705,6 +752,7 @@ function showView(v) {
   if(v==='dashboard') renderDashboard();
   if(v==='propostas') { populateParceiroFilter('filter-parceiro'); renderPropostasTable(); }
   if(v==='parceiros') renderParceirosTable();
+  if(v==='instituicoes') renderInstituicoesTable();
   if(v==='comissoes') { populateParceiroFilter('com-filter-parceiro'); renderComissoes(); }
   if(v==='usuarios') renderUsuariosTable();
 }
@@ -735,6 +783,7 @@ function openNewProposta() {
   document.getElementById('p-partnerComm').value = 0;
   document.getElementById('p-bitributComm').value = 0;
   populateParceiroSelectInForm();
+  populateInstituicaoSelectInForm();
   updateCommissionPreview();
   openModal('modal-proposta');
 }
@@ -744,12 +793,13 @@ function editProposta(id) {
   if(!p) return;
   document.getElementById('modal-proposta-title').textContent = 'Editar Proposta';
   populateParceiroSelectInForm();
+  populateInstituicaoSelectInForm();
   document.getElementById('p-clientName').value = p.clientName;
   document.getElementById('p-clientCpfCnpj').value = p.clientCpfCnpj || '';
   document.getElementById('p-clientPhone').value = p.clientPhone || '';
   document.getElementById('p-clientEmail').value = p.clientEmail || '';
   document.getElementById('p-loanType').value = p.loanType || '';
-  document.getElementById('p-institution').value = p.institution || '';
+  document.getElementById('p-institution').value = p.instituicaoId || '';
   document.getElementById('p-loanValue').value = p.loanValue;
   document.getElementById('p-status').value = p.status;
   document.getElementById('p-partnerId').value = p.partnerId || '';
@@ -772,7 +822,8 @@ async function saveProposta(e) {
     clientPhone: document.getElementById('p-clientPhone').value.trim(),
     clientEmail: document.getElementById('p-clientEmail').value.trim(),
     loanType: document.getElementById('p-loanType').value,
-    institution: document.getElementById('p-institution').value.trim(),
+    instituicaoId: document.getElementById('p-institution').value,
+    institution: (CACHE.instituicoes.find(x=>x.id===document.getElementById('p-institution').value)||{name:''}).name,
     loanValue: lv, status: document.getElementById('p-status').value,
     partnerId: document.getElementById('p-partnerId').value,
     partnerComm: pc, bitributComm: bc,
@@ -857,6 +908,78 @@ function autoFillPartnerCommission() {
   if(!pid) { document.getElementById('p-partnerComm').value=0; updateCommissionPreview(); return; }
   const p = CACHE.parceiros.find(x=>x.id===pid);
   if(p) { document.getElementById('p-partnerComm').value = p.defaultComm; updateCommissionPreview(); }
+}
+
+function populateInstituicaoSelectInForm() {
+  const sel = document.getElementById('p-institution');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Selecione...</option>' + CACHE.instituicoes.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');
+  sel.value = cur;
+}
+
+function autoFillInstitutionCommission() {
+  const iid = document.getElementById('p-institution').value;
+  if(!iid) { document.getElementById('p-bitributComm').value=0; updateCommissionPreview(); return; }
+  const inst = CACHE.instituicoes.find(x=>x.id===iid);
+  if(inst) { document.getElementById('p-bitributComm').value = inst.commBitribut; updateCommissionPreview(); }
+}
+
+function renderInstituicoesTable() {
+  const tbody = document.getElementById('instituicoes-tbody');
+  if(!CACHE.instituicoes.length) { tbody.innerHTML='<tr><td colspan="6" class="no-data">Nenhuma instituição cadastrada</td></tr>'; return; }
+  tbody.innerHTML = CACHE.instituicoes.map(inst => {
+    const props = CACHE.propostas.filter(p=>p.instituicaoId===inst.id);
+    const vol = props.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
+    const comm = props.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0),0);
+    return `<tr>
+      <td style="font-weight:600">${inst.name}</td>
+      <td style="color:var(--success);font-weight:700">${inst.commBitribut}%</td>
+      <td>${props.length}</td>
+      <td>${fmt(vol)}</td>
+      <td style="color:var(--success);font-weight:700">${fmt(comm)}</td>
+      <td><button class="btn btn-sm btn-outline" onclick="editInstituicao('${inst.id}')">✏️</button> <button class="btn btn-sm btn-outline" style="color:var(--danger)" onclick="deleteInstituicao('${inst.id}')">🗑️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function openNewInstituicao() {
+  document.getElementById('inst-name').value='';
+  document.getElementById('inst-comm').value=0;
+  document.getElementById('inst-id').value='';
+  document.getElementById('modal-instituicao-title').textContent='Nova Instituição';
+  openModal('modal-instituicao');
+}
+
+function editInstituicao(id) {
+  const inst = CACHE.instituicoes.find(x=>x.id===id); if(!inst) return;
+  document.getElementById('inst-name').value = inst.name;
+  document.getElementById('inst-comm').value = inst.commBitribut;
+  document.getElementById('inst-id').value = inst.id;
+  document.getElementById('modal-instituicao-title').textContent='Editar Instituição';
+  openModal('modal-instituicao');
+}
+
+async function saveInstituicao(e) {
+  e.preventDefault();
+  const id = document.getElementById('inst-id').value;
+  const data = { name: document.getElementById('inst-name').value.trim(), commBitribut: parseFloat(document.getElementById('inst-comm').value)||0 };
+  try {
+    if(id) { await API.put('/api/instituicoes/'+id, data); const i=CACHE.instituicoes.find(x=>x.id===id); Object.assign(i,{...data,commBitribut:data.commBitribut}); }
+    else { const r=await API.post('/api/instituicoes',data); CACHE.instituicoes.push({...r,commBitribut:r.comm_bitribut}); CACHE.instituicoes.sort((a,b)=>a.name.localeCompare(b.name)); }
+    closeModal('modal-instituicao');
+    renderInstituicoesTable();
+    showToast('Instituição salva!','success');
+  } catch(err) { showToast(err.message,'error'); }
+}
+
+async function deleteInstituicao(id) {
+  if(!confirm('Excluir esta instituição?')) return;
+  try {
+    await API.del('/api/instituicoes/'+id);
+    CACHE.instituicoes = CACHE.instituicoes.filter(x=>x.id!==id);
+    renderInstituicoesTable();
+    showToast('Instituição excluída','success');
+  } catch(err) { showToast(err.message,'error'); }
 }
 
 function renderPropostasTable() {
