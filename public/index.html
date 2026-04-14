@@ -474,14 +474,12 @@
           </div>
           <div class="form-group"></div>
           <div class="form-group"><label>% Comissão Parceiro</label><input type="number" id="p-partnerComm" min="0" max="100" step="0.01" value="0" oninput="updateCommissionPreview()"></div>
-          <div class="form-group"><label>% Comissão AGC (Bitribut)</label><input type="number" id="p-bitributComm" min="0" max="100" step="0.01" value="0" oninput="updateCommissionPreview()"></div>
-          <div class="form-group"><label>% Comissão Instituição <span style="font-size:.75rem;color:var(--success);font-weight:600">(auto-preenchido)</span></label><input type="number" id="p-instComm" min="0" max="100" step="0.01" value="0" oninput="updateCommissionPreview()"></div>
-          <div class="form-group"></div>
+          <div class="form-group"><label>% Comissão Bitribut</label><input type="number" id="p-bitributComm" min="0" max="100" step="0.01" value="0" oninput="updateCommissionPreview()"></div>
           <div class="commission-preview" id="comm-preview" style="grid-column:1/-1">
             <div class="cp-item"><span class="cp-label">Valor do Empréstimo</span><span class="cp-value" id="prev-loan">R$ 0,00</span></div>
             <div class="cp-item"><span class="cp-label">💰 Parceiro</span><span class="cp-value orange" id="prev-partner">R$ 0,00</span></div>
-            <div class="cp-item"><span class="cp-label">🏢 AGC (Bitribut)</span><span class="cp-value green" id="prev-bitribut">R$ 0,00</span></div>
-            <div class="cp-item"><span class="cp-label">🏦 Instituição</span><span class="cp-value green" id="prev-inst">R$ 0,00</span></div>
+            <div class="cp-item"><span class="cp-label">🏢 Bitribut (manual)</span><span class="cp-value green" id="prev-bitribut">R$ 0,00</span></div>
+            <div class="cp-item"><span class="cp-label">🏦 Instituição <span id="prev-inst-label"></span></span><span class="cp-value green" id="prev-inst">R$ 0,00</span></div>
             <div class="cp-item" style="border-top:2px solid var(--primary);margin-top:4px;padding-top:8px"><span class="cp-label" style="font-weight:800;color:var(--primary)">📊 Total Bitribut</span><span class="cp-value" id="prev-total" style="color:var(--primary);font-weight:800">R$ 0,00</span></div>
           </div>
           <div class="section-divider">📝 Observações</div>
@@ -785,7 +783,6 @@ function openNewProposta() {
   document.getElementById('p-id').value = '';
   document.getElementById('p-partnerComm').value = 0;
   document.getElementById('p-bitributComm').value = 0;
-  document.getElementById('p-instComm').value = 0;
   populateParceiroSelectInForm();
   populateInstituicaoSelectInForm();
   updateCommissionPreview();
@@ -809,7 +806,6 @@ function editProposta(id) {
   document.getElementById('p-partnerId').value = p.partnerId || '';
   document.getElementById('p-partnerComm').value = p.partnerComm || 0;
   document.getElementById('p-bitributComm').value = p.bitributComm || 0;
-  document.getElementById('p-instComm').value = p.instComm || 0;
   document.getElementById('p-notes').value = p.notes || '';
   document.getElementById('p-id').value = p.id;
   updateCommissionPreview();
@@ -832,9 +828,11 @@ async function saveProposta(e) {
     institution: (CACHE.instituicoes.find(x=>x.id===document.getElementById('p-institution').value)||{name:''}).name,
     loanValue: lv, status: document.getElementById('p-status').value,
     partnerId: document.getElementById('p-partnerId').value,
-    partnerComm: pc, bitributComm: bc, instComm: ic,
-    partnerCommValue: pct(lv,pc), bitributCommValue: pct(lv,bc), instCommValue: pct(lv,ic),
-    totalCommValue: pct(lv,pc)+pct(lv,bc)+pct(lv,ic),
+    partnerComm: pc, bitributComm: bc,
+    instComm: (()=>{ const iid=document.getElementById('p-institution').value; const inst=CACHE.instituicoes.find(x=>x.id===iid); return inst?inst.commBitribut:0; })(),
+    partnerCommValue: pct(lv,pc), bitributCommValue: pct(lv,bc),
+    instCommValue: (()=>{ const iid=document.getElementById('p-institution').value; const inst=CACHE.instituicoes.find(x=>x.id===iid); return inst?pct(lv,inst.commBitribut):0; })(),
+    totalCommValue: (()=>{ const iid=document.getElementById('p-institution').value; const inst=CACHE.instituicoes.find(x=>x.id===iid); const ic=inst?inst.commBitribut:0; return pct(lv,pc)+pct(lv,bc)+pct(lv,ic); })(),
     notes: document.getElementById('p-notes').value.trim(),
   };
   const id = document.getElementById('p-id').value;
@@ -891,11 +889,14 @@ function updateCommissionPreview() {
   const v = parseFloat(document.getElementById('p-loanValue').value)||0;
   const pc = parseFloat(document.getElementById('p-partnerComm').value)||0;
   const bc = parseFloat(document.getElementById('p-bitributComm').value)||0;
-  const ic = parseFloat(document.getElementById('p-instComm').value)||0;
+  const iid = document.getElementById('p-institution').value;
+  const inst = CACHE.instituicoes.find(x=>x.id===iid);
+  const ic = inst ? inst.commBitribut : 0;
   document.getElementById('prev-loan').textContent = fmt(v);
   document.getElementById('prev-partner').textContent = fmt(pct(v,pc));
   document.getElementById('prev-bitribut').textContent = fmt(pct(v,bc));
   document.getElementById('prev-inst').textContent = fmt(pct(v,ic));
+  document.getElementById('prev-inst-label').textContent = inst ? `(${inst.name} ${ic}%)` : '';
   document.getElementById('prev-total').textContent = fmt(pct(v,bc)+pct(v,ic));
 }
 
@@ -928,10 +929,7 @@ function populateInstituicaoSelectInForm() {
 }
 
 function autoFillInstitutionCommission() {
-  const iid = document.getElementById('p-institution').value;
-  if(!iid) { document.getElementById('p-instComm').value=0; updateCommissionPreview(); return; }
-  const inst = CACHE.instituicoes.find(x=>x.id===iid);
-  if(inst) { document.getElementById('p-instComm').value = inst.commBitribut; updateCommissionPreview(); }
+  updateCommissionPreview();
 }
 
 function renderInstituicoesTable() {
