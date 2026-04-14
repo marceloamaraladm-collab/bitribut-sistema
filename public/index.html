@@ -331,7 +331,7 @@
             <option value="">Todos os Status</option>
             <option>Prospecção</option><option>Documentação</option><option>Análise de Crédito</option>
             <option>Aprovação</option><option>Contratação</option><option>Liberado</option>
-            <option>Concluído</option><option>Cancelado</option>
+            <option>Concluído</option><option>Cancelado</option><option>Reprovado</option>
           </select>
           <select class="filter-input" id="filter-tipo" onchange="renderPropostasTable()">
             <option value="">Todos os Tipos</option>
@@ -463,7 +463,7 @@
             <select id="p-status" required>
               <option>Prospecção</option><option>Documentação</option><option>Análise de Crédito</option>
               <option>Aprovação</option><option>Contratação</option><option>Liberado</option>
-              <option>Concluído</option><option>Cancelado</option>
+              <option>Concluído</option><option>Cancelado</option><option>Reprovado</option>
             </select>
           </div>
           <div class="section-divider">🤝 Parceiro / Comissões</div>
@@ -627,9 +627,9 @@ let CACHE = { propostas: [], parceiros: [], instituicoes: [] };
 const STATUS_BADGE = {
   'Prospecção':'prospeccao','Documentação':'documentacao','Análise de Crédito':'analise',
   'Aprovação':'aprovacao','Contratação':'contratacao','Liberado':'liberado',
-  'Concluído':'concluido','Cancelado':'cancelado'
+  'Concluído':'concluido','Cancelado':'cancelado','Reprovado':'cancelado'
 };
-const STATUSES = ['Prospecção','Documentação','Análise de Crédito','Aprovação','Contratação','Liberado','Concluído'];
+const STATUSES = ['Prospecção','Documentação','Análise de Crédito','Aprovação','Contratação','Liberado','Concluído','Cancelado','Reprovado'];
 
 function fmt(v) { return 'R$ ' + parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function pct(v,p) { return parseFloat(v||0)*parseFloat(p||0)/100; }
@@ -1183,18 +1183,20 @@ async function renderUsuariosTable() {
 // ============================================================
 function renderDashboard() {
   const all = CACHE.propostas;
-  const ativas = all.filter(p=>p.status!=='Cancelado');
+  const ativas = all.filter(p=>p.status!=='Cancelado'&&p.status!=='Reprovado');
   const totalVol = ativas.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
-  const totBitribut = ativas.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0),0);
-  const totParceiro = ativas.reduce((a,p)=>a+parseFloat(p.partnerCommValue||0),0);
   const liberados = all.filter(p=>p.status==='Liberado'||p.status==='Concluído');
   const volLib = liberados.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
+  const totBitribut = ativas.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0),0);
+  const totParceiro = ativas.reduce((a,p)=>a+parseFloat(p.partnerCommValue||0),0);
+  const totBitributLib = liberados.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0),0);
+  const totParceiroLib = liberados.reduce((a,p)=>a+parseFloat(p.partnerCommValue||0),0);
 
   document.getElementById('kpi-grid').innerHTML = `
     <div class="kpi-card blue"><div class="kpi-label">Total de Propostas</div><div class="kpi-value">${all.length}</div><div class="kpi-sub">${ativas.length} ativas</div></div>
     <div class="kpi-card orange"><div class="kpi-label">Volume Total (R$)</div><div class="kpi-value" style="font-size:1.3rem">${fmt(totalVol)}</div><div class="kpi-sub">${fmt(volLib)} liberado</div></div>
-    <div class="kpi-card green"><div class="kpi-label">Comissão Bitribut</div><div class="kpi-value" style="font-size:1.3rem">${fmt(totBitribut)}</div><div class="kpi-sub">Total previsto</div></div>
-    <div class="kpi-card purple"><div class="kpi-label">Comissão Parceiros</div><div class="kpi-value" style="font-size:1.3rem">${fmt(totParceiro)}</div><div class="kpi-sub">A repassar</div></div>
+    <div class="kpi-card green"><div class="kpi-label">Comissão Bitribut</div><div class="kpi-value" style="font-size:1.3rem">${fmt(totBitribut)}</div><div class="kpi-sub">Confirmado: ${fmt(totBitributLib)}</div></div>
+    <div class="kpi-card purple"><div class="kpi-label">Comissão Parceiros</div><div class="kpi-value" style="font-size:1.3rem">${fmt(totParceiro)}</div><div class="kpi-sub">Confirmado: ${fmt(totParceiroLib)}</div></div>
     <div class="kpi-card red"><div class="kpi-label">Parceiros Ativos</div><div class="kpi-value">${CACHE.parceiros.length}</div><div class="kpi-sub">Indicadores cadastrados</div></div>`;
 
   const steps = [
@@ -1239,7 +1241,7 @@ function renderComissoes() {
   let list = CACHE.propostas.filter(p => {
     if(fStatus && p.status!==fStatus) return false;
     if(fParceiro && p.partnerId!==fParceiro) return false;
-    return p.status!=='Cancelado';
+    return p.status!=='Cancelado'&&p.status!=='Reprovado';
   });
   const totBagc = list.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0),0);
   const totBinst = list.reduce((a,p)=>a+parseFloat(p.instCommValue||0),0);
