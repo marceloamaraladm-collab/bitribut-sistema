@@ -817,22 +817,22 @@ async function saveProposta(e) {
   const lv = parseFloat(document.getElementById('p-loanValue').value) || 0;
   const pc = parseFloat(document.getElementById('p-partnerComm').value) || 0;
   const bc = parseFloat(document.getElementById('p-bitributComm').value) || 0;
-  const ic = parseFloat(document.getElementById('p-instComm').value) || 0;
+  const iid = document.getElementById('p-institution').value;
+  const instObj = CACHE.instituicoes.find(x=>x.id===iid);
+  const ic = instObj ? instObj.commBitribut : 0;
   const body = {
     clientName: document.getElementById('p-clientName').value.trim(),
     clientCpfCnpj: document.getElementById('p-clientCpfCnpj').value.trim(),
     clientPhone: document.getElementById('p-clientPhone').value.trim(),
     clientEmail: document.getElementById('p-clientEmail').value.trim(),
     loanType: document.getElementById('p-loanType').value,
-    instituicaoId: document.getElementById('p-institution').value,
-    institution: (CACHE.instituicoes.find(x=>x.id===document.getElementById('p-institution').value)||{name:''}).name,
+    instituicaoId: iid,
+    institution: instObj ? instObj.name : '',
     loanValue: lv, status: document.getElementById('p-status').value,
     partnerId: document.getElementById('p-partnerId').value,
-    partnerComm: pc, bitributComm: bc,
-    instComm: (()=>{ const iid=document.getElementById('p-institution').value; const inst=CACHE.instituicoes.find(x=>x.id===iid); return inst?inst.commBitribut:0; })(),
-    partnerCommValue: pct(lv,pc), bitributCommValue: pct(lv,bc),
-    instCommValue: (()=>{ const iid=document.getElementById('p-institution').value; const inst=CACHE.instituicoes.find(x=>x.id===iid); return inst?pct(lv,inst.commBitribut):0; })(),
-    totalCommValue: (()=>{ const iid=document.getElementById('p-institution').value; const inst=CACHE.instituicoes.find(x=>x.id===iid); const ic=inst?inst.commBitribut:0; return pct(lv,pc)+pct(lv,bc)+pct(lv,ic); })(),
+    partnerComm: pc, bitributComm: bc, instComm: ic,
+    partnerCommValue: pct(lv,pc), bitributCommValue: pct(lv,bc), instCommValue: pct(lv,ic),
+    totalCommValue: pct(lv,pc)+pct(lv,bc)+pct(lv,ic),
     notes: document.getElementById('p-notes').value.trim(),
   };
   const id = document.getElementById('p-id').value;
