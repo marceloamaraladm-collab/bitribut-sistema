@@ -335,8 +335,8 @@
           </select>
           <select class="filter-input" id="filter-tipo" onchange="renderPropostasTable()">
             <option value="">Todos os Tipos</option>
-            <option>Capital de Giro</option><option>Crédito Imobiliário</option><option>Consignado</option>
-            <option>Antecipação de Recebíveis</option><option>BNDES/Fomento</option><option>Outro</option>
+            <option>Capital de Giro</option><option>Crédito Imobiliário</option><option>Home Equity</option>
+            <option>Consignado</option><option>Antecipação de Recebíveis</option><option>BNDES/Fomento</option><option>Outro</option>
           </select>
           <select class="filter-input" id="filter-parceiro" onchange="renderPropostasTable()">
             <option value="">Todos os Parceiros</option>
@@ -449,8 +449,8 @@
           <div class="form-group"><label>Tipo de Crédito *</label>
             <select id="p-loanType" required>
               <option value="">Selecione...</option>
-              <option>Capital de Giro</option><option>Crédito Imobiliário</option><option>Consignado</option>
-              <option>Antecipação de Recebíveis</option><option>BNDES/Fomento</option><option>Outro</option>
+              <option>Capital de Giro</option><option>Crédito Imobiliário</option><option>Home Equity</option>
+              <option>Consignado</option><option>Antecipação de Recebíveis</option><option>BNDES/Fomento</option><option>Outro</option>
             </select>
           </div>
           <div class="form-group"><label>Instituição Financeira</label>
@@ -727,7 +727,7 @@ async function initApp() {
 async function loadData() {
   try {
     const [p, par, inst] = await Promise.all([API.get('/api/propostas'), API.get('/api/parceiros'), API.get('/api/instituicoes')]);
-    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdAt: x.created_at }));
+    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdBy: x.created_by, createdAt: x.created_at }));
     CACHE.parceiros = par.map(x => ({ ...x, defaultComm: x.default_comm, createdAt: x.created_at }));
     CACHE.instituicoes = inst.map(x => ({ ...x, commBitribut: x.comm_bitribut, createdAt: x.created_at }));
   } catch(e) { showToast('Erro ao carregar dados: ' + e.message, 'error'); }
@@ -881,6 +881,8 @@ function viewProposta(id) {
     </div>
     ${p.notes?`<div style="margin-bottom:18px"><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:5px">Observações</div><div style="background:var(--bg);padding:10px 12px;border-radius:7px;font-size:.875rem">${p.notes}</div></div>`:''}
     <div><div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">🔀 Linha do Tempo</div><div class="timeline">${tl}</div></div>`;
+  const canEdit = SESSION.user.role==='admin' || p.createdBy===SESSION.user.id;
+  document.getElementById('detalhe-edit-btn').style.display = canEdit ? '' : 'none';
   document.getElementById('detalhe-edit-btn').onclick = () => { closeModal('modal-detalhe'); editProposta(id); };
   openModal('modal-detalhe');
 }
@@ -1021,8 +1023,7 @@ function renderPropostasTable() {
       <td style="font-size:.78rem;color:var(--text-muted)">${new Date(p.createdAt).toLocaleDateString('pt-BR')}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-sm" onclick="viewProposta('${p.id}')">👁️</button>
-        <button class="btn btn-outline btn-sm" onclick="editProposta('${p.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteProposta('${p.id}')">🗑️</button>
+        ${(SESSION.user.role==='admin'||p.createdBy===SESSION.user.id)?`<button class="btn btn-outline btn-sm" onclick="editProposta('${p.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="deleteProposta('${p.id}')">🗑️</button>`:''}
       </td></tr>`;
   }).join('');
 }

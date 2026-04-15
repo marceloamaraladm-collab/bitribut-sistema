@@ -277,6 +277,12 @@ app.post('/api/propostas', auth, (req, res) => {
 });
 
 app.put('/api/propostas/:id', auth, (req, res) => {
+  if (req.user.role !== 'admin') {
+    const existing = db.prepare('SELECT created_by FROM propostas WHERE id = ?').get(req.params.id);
+    if (!existing || existing.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'Você só pode editar propostas que cadastrou.' });
+    }
+  }
   const p = req.body;
   const now = new Date().toISOString();
   db.prepare(`UPDATE propostas SET
@@ -293,6 +299,12 @@ app.put('/api/propostas/:id', auth, (req, res) => {
 });
 
 app.delete('/api/propostas/:id', auth, (req, res) => {
+  if (req.user.role !== 'admin') {
+    const existing = db.prepare('SELECT created_by FROM propostas WHERE id = ?').get(req.params.id);
+    if (!existing || existing.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'Você só pode excluir propostas que cadastrou.' });
+    }
+  }
   db.prepare('DELETE FROM propostas WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
