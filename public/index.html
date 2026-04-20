@@ -331,7 +331,7 @@
             <option value="">Todos os Status</option>
             <option>Prospecção</option><option>Documentação</option><option>Análise de Crédito</option>
             <option>Aprovação</option><option>Contratação</option><option>Liberado</option>
-            <option>Concluído</option><option>Cancelado</option><option>Reprovado</option>
+            <option>Concluído</option><option>Cancelado</option><option>Reprovado</option><option>Ajuizar Mandato</option>
           </select>
           <select class="filter-input" id="filter-tipo" onchange="renderPropostasTable()">
             <option value="">Todos os Tipos</option>
@@ -463,7 +463,7 @@
             <select id="p-status" required>
               <option>Prospecção</option><option>Documentação</option><option>Análise de Crédito</option>
               <option>Aprovação</option><option>Contratação</option><option>Liberado</option>
-              <option>Concluído</option><option>Cancelado</option><option>Reprovado</option>
+              <option>Concluído</option><option>Cancelado</option><option>Reprovado</option><option>Ajuizar Mandato</option>
             </select>
           </div>
           <div class="section-divider">🤝 Parceiro / Comissões</div>
@@ -627,9 +627,9 @@ let CACHE = { propostas: [], parceiros: [], instituicoes: [], users: [] };
 const STATUS_BADGE = {
   'Prospecção':'prospeccao','Documentação':'documentacao','Análise de Crédito':'analise',
   'Aprovação':'aprovacao','Contratação':'contratacao','Liberado':'liberado',
-  'Concluído':'concluido','Cancelado':'cancelado','Reprovado':'cancelado'
+  'Concluído':'concluido','Cancelado':'cancelado','Reprovado':'cancelado','Ajuizar Mandato':'analise'
 };
-const STATUSES = ['Prospecção','Documentação','Análise de Crédito','Aprovação','Contratação','Liberado','Concluído','Cancelado','Reprovado'];
+const STATUSES = ['Prospecção','Documentação','Análise de Crédito','Aprovação','Contratação','Liberado','Concluído','Cancelado','Reprovado','Ajuizar Mandato'];
 
 function fmt(v) { return 'R$ ' + parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function pct(v,p) { return parseFloat(v||0)*parseFloat(p||0)/100; }
@@ -1200,7 +1200,7 @@ async function renderUsuariosTable() {
 // ============================================================
 function renderDashboard() {
   const all = CACHE.propostas;
-  const ativas = all.filter(p=>p.status!=='Cancelado'&&p.status!=='Reprovado');
+  const ativas = all.filter(p=>p.status!=='Cancelado'&&p.status!=='Reprovado'&&p.status!=='Ajuizar Mandato');
   const totalVol = ativas.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
   const liberados = all.filter(p=>p.status==='Liberado'||p.status==='Concluído');
   const volLib = liberados.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
@@ -1258,7 +1258,7 @@ function renderComissoes() {
   let list = CACHE.propostas.filter(p => {
     if(fStatus && p.status!==fStatus) return false;
     if(fParceiro && p.partnerId!==fParceiro) return false;
-    return p.status!=='Cancelado'&&p.status!=='Reprovado';
+    return p.status!=='Cancelado'&&p.status!=='Reprovado'&&p.status!=='Ajuizar Mandato';
   });
   const totBagc = list.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0),0);
   const totBinst = list.reduce((a,p)=>a+parseFloat(p.instCommValue||0),0);
