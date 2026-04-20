@@ -72,6 +72,19 @@ try { db.exec(`ALTER TABLE propostas ADD COLUMN instituicao_id TEXT DEFAULT ''`)
 try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm REAL DEFAULT 0`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm_value REAL DEFAULT 0`); } catch(e) {}
 
+// History table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS proposta_historico (
+    id TEXT PRIMARY KEY,
+    proposta_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`);
+
 // Create default admin if not exists
 const adminExists = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@bitribut.com.br');
 if (!adminExists) {
@@ -258,6 +271,10 @@ app.get('/api/propostas', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM propostas ORDER BY created_at DESC').all());
 });
 
+app.get('/api/propostas/:id/historico', auth, (req, res) => {
+  res.json(db.prepare('SELECT * FROM proposta_historico WHERE proposta_id = ? ORDER BY created_at ASC').all(req.params.id));
+});
+
 app.post('/api/propostas', auth, (req, res) => {
   const p = req.body;
   const id = uid();
@@ -273,6 +290,8 @@ app.post('/api/propostas', auth, (req, res) => {
       p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0, p.instComm || 0,
       p.partnerCommValue || 0, p.bitributCommValue || 0, p.instCommValue || 0, p.totalCommValue || 0,
       p.notes || '', req.user.id, now, now);
+  db.prepare('INSERT INTO proposta_historico (id,proposta_id,user_id,user_name,action,detail,created_at) VALUES (?,?,?,?,?,?,?)')
+    .run(uid(), id, req.user.id, req.user.name, 'criou', `Proposta criada com status "${p.status || 'Prospecção'}"`, now);
   res.json({ id });
 });
 
@@ -285,6 +304,7 @@ app.put('/api/propostas/:id', auth, (req, res) => {
   }
   const p = req.body;
   const now = new Date().toISOString();
+  const before = db.prepare('SELECT status FROM propostas WHERE id = ?').get(req.params.id);
   db.prepare(`UPDATE propostas SET
     client_name=?,client_cpfcnpj=?,client_phone=?,client_email=?,loan_type=?,institution=?,instituicao_id=?,
     loan_value=?,status=?,partner_id=?,partner_comm=?,bitribut_comm=?,inst_comm=?,partner_comm_value=?,
@@ -295,6 +315,11 @@ app.put('/api/propostas/:id', auth, (req, res) => {
       p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0, p.instComm || 0,
       p.partnerCommValue || 0, p.bitributCommValue || 0, p.instCommValue || 0, p.totalCommValue || 0,
       p.notes || '', now, req.params.id);
+  const detail = before && before.status !== p.status
+    ? `Status alterado de "${before.status}" para "${p.status}"`
+    : 'Dados da proposta atualizados';
+  db.prepare('INSERT INTO proposta_historico (id,proposta_id,user_id,user_name,action,detail,created_at) VALUES (?,?,?,?,?,?,?)')
+    .run(uid(), req.params.id, req.user.id, req.user.name, 'editou', detail, now);
   res.json({ ok: true });
 });
 

@@ -622,7 +622,7 @@
 //  STATE
 // ============================================================
 let SESSION = { token: localStorage.getItem('bt_token'), user: JSON.parse(localStorage.getItem('bt_user') || 'null') };
-let CACHE = { propostas: [], parceiros: [], instituicoes: [] };
+let CACHE = { propostas: [], parceiros: [], instituicoes: [], users: [] };
 
 const STATUS_BADGE = {
   'Prospecção':'prospeccao','Documentação':'documentacao','Análise de Crédito':'analise',
@@ -730,6 +730,7 @@ async function loadData() {
     CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdBy: x.created_by, createdAt: x.created_at }));
     CACHE.parceiros = par.map(x => ({ ...x, defaultComm: x.default_comm, createdAt: x.created_at }));
     CACHE.instituicoes = inst.map(x => ({ ...x, commBitribut: x.comm_bitribut, createdAt: x.created_at }));
+    try { CACHE.users = await API.get('/api/users'); } catch(e) { /* non-admin, ignore */ }
   } catch(e) { showToast('Erro ao carregar dados: ' + e.message, 'error'); }
 }
 
@@ -856,11 +857,11 @@ async function deleteProposta(id) {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-function viewProposta(id) {
+async function viewProposta(id) {
   const p = CACHE.propostas.find(x => x.id===id); if(!p) return;
   const par = CACHE.parceiros.find(x => x.id===p.partnerId);
   const si = STATUSES.indexOf(p.status);
-  const tl = STATUSES.map((s,i) => `<div class="tl-step"><div class="tl-dot ${i<si?'active':(i===si?'current':'')}"></div><div class="tl-label">${s}</div>${i===si?'<div class="tl-sub">← Status atual</div>':''}</div>`).join('');
+  const tl = STATUSES.filter(s=>!['Cancelado','Reprovado'].includes(s)).map((s,i,arr) => `<div class="tl-step"><div class="tl-dot ${STATUSES.indexOf(s)<si?'active':(s===p.status?'current':'')}"></div><div class="tl-label">${s}</div>${s===p.status?'<div class="tl-sub">← atual</div>':''}</div>`).join('');
   document.getElementById('detalhe-title').textContent = p.clientName;
   document.getElementById('detalhe-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
@@ -871,7 +872,7 @@ function viewProposta(id) {
       <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Instituição</div>${p.institution||'—'}</div>
       <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Valor</div><span style="font-size:1.2rem;font-weight:800;color:var(--primary)">${fmt(p.loanValue)}</span></div>
       <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Parceiro</div>${par?par.name:'—'}</div>
-      <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Cadastrado</div>${new Date(p.createdAt).toLocaleDateString('pt-BR')}</div>
+      <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Cadastrado por</div>${p.createdBy ? (CACHE.users||[]).find(u=>u.id===p.createdBy)?.name || p.createdBy : '—'} · ${new Date(p.createdAt).toLocaleDateString('pt-BR')}</div>
     </div>
     <div style="display:flex;gap:16px;background:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:18px;flex-wrap:wrap">
       <div><div style="font-size:.7rem;color:var(--text-muted);font-weight:700;text-transform:uppercase">Comissão Parceiro</div><div style="font-size:1.05rem;font-weight:800;color:var(--accent-dark)">${fmt(p.partnerCommValue)} (${p.partnerComm}%)</div></div>
@@ -880,11 +881,26 @@ function viewProposta(id) {
       <div><div style="font-size:.7rem;color:var(--text-muted);font-weight:700;text-transform:uppercase">Total Bitribut</div><div style="font-size:1.15rem;font-weight:800;color:var(--primary)">${fmt(parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0))}</div></div>
     </div>
     ${p.notes?`<div style="margin-bottom:18px"><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:5px">Observações</div><div style="background:var(--bg);padding:10px 12px;border-radius:7px;font-size:.875rem">${p.notes}</div></div>`:''}
-    <div><div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">🔀 Linha do Tempo</div><div class="timeline">${tl}</div></div>`;
+    <div style="margin-bottom:18px"><div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">🔀 Linha do Tempo</div><div class="timeline">${tl}</div></div>
+    <div id="hist-section"><div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">📋 Histórico de Alterações</div><div id="hist-list" style="font-size:.85rem;color:var(--text-muted);padding:8px 0">Carregando...</div></div>`;
   const canEdit = SESSION.user.role==='admin' || p.createdBy===SESSION.user.id;
   document.getElementById('detalhe-edit-btn').style.display = canEdit ? '' : 'none';
   document.getElementById('detalhe-edit-btn').onclick = () => { closeModal('modal-detalhe'); editProposta(id); };
   openModal('modal-detalhe');
+  try {
+    const hist = await API.get('/api/propostas/'+id+'/historico');
+    const histEl = document.getElementById('hist-list');
+    if(!histEl) return;
+    if(!hist.length) { histEl.textContent = 'Nenhuma alteração registrada.'; return; }
+    histEl.innerHTML = hist.map(h => `
+      <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--primary-light);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0">${h.user_name.charAt(0).toUpperCase()}</div>
+        <div style="flex:1">
+          <div><strong>${h.user_name}</strong> <span style="color:var(--text-muted)">${h.detail}</span></div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">${new Date(h.created_at).toLocaleString('pt-BR')}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) { const el=document.getElementById('hist-list'); if(el) el.textContent='Erro ao carregar histórico.'; }
 }
 
 function updateCommissionPreview() {
