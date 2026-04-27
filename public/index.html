@@ -634,6 +634,17 @@ const STATUSES = ['Prospecção','Documentação','Análise de Crédito','Aprova
 function fmt(v) { return 'R$ ' + parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function pct(v,p) { return parseFloat(v||0)*parseFloat(p||0)/100; }
 
+const STATUS_PRAZOS = { 'Prospecção': 10, 'Documentação': 5 };
+function atrasoTag(p) {
+  const prazo = STATUS_PRAZOS[p.status];
+  if (!prazo) return '';
+  const ref = p.statusChangedAt || p.createdAt;
+  if (!ref) return '';
+  const dias = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+  if (dias <= prazo) return '';
+  return ` <span style="background:#e74c3c;color:#fff;font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">em atraso ${dias}d</span>`;
+}
+
 // ============================================================
 //  API
 // ============================================================
@@ -727,7 +738,7 @@ async function initApp() {
 async function loadData() {
   try {
     const [p, par, inst] = await Promise.all([API.get('/api/propostas'), API.get('/api/parceiros'), API.get('/api/instituicoes')]);
-    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdBy: x.created_by, createdAt: x.created_at }));
+    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdBy: x.created_by, createdAt: x.created_at, statusChangedAt: x.status_changed_at||x.created_at }));
     CACHE.parceiros = par.map(x => ({ ...x, defaultComm: x.default_comm, createdAt: x.created_at }));
     CACHE.instituicoes = inst.map(x => ({ ...x, commBitribut: x.comm_bitribut, createdAt: x.created_at }));
     try { CACHE.users = await API.get('/api/users'); } catch(e) { /* non-admin, ignore */ }
@@ -1035,7 +1046,7 @@ function renderPropostasTable() {
       <td style="font-size:.8rem">${p.institution||'—'}</td>
       <td>${par?`<span style="font-weight:600">${par.name}</span>`:'<span style="color:var(--text-muted)">—</span>'}</td>
       <td style="font-weight:700;color:var(--success)">${fmt(p.totalCommValue)}</td>
-      <td><span class="badge badge-${bk}">${p.status}</span></td>
+      <td><span class="badge badge-${bk}">${p.status}</span>${atrasoTag(p)}</td>
       <td style="font-size:.78rem;color:var(--text-muted)">${new Date(p.createdAt).toLocaleDateString('pt-BR')}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-sm" onclick="viewProposta('${p.id}')">👁️</button>
@@ -1231,7 +1242,7 @@ function renderDashboard() {
   const dashTbody = document.getElementById('dash-recentes');
   dashTbody.innerHTML = recentes.length ? recentes.map(p => {
     const bk = STATUS_BADGE[p.status]||'prospeccao';
-    return `<tr onclick="viewProposta('${p.id}')" style="cursor:pointer"><td><strong>${p.clientName}</strong></td><td style="font-weight:700;color:var(--primary)">${fmt(p.loanValue)}</td><td><span class="badge badge-${bk}">${p.status}</span></td></tr>`;
+    return `<tr onclick="viewProposta('${p.id}')" style="cursor:pointer"><td><strong>${p.clientName}</strong></td><td style="font-weight:700;color:var(--primary)">${fmt(p.loanValue)}</td><td><span class="badge badge-${bk}">${p.status}</span>${atrasoTag(p)}</td></tr>`;
   }).join('') : '<tr><td colspan="3" class="no-data">Nenhuma proposta ainda.</td></tr>';
 
   const parStats = CACHE.parceiros.map(p => {
