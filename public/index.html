@@ -341,6 +341,9 @@
           <select class="filter-input" id="filter-parceiro" onchange="renderPropostasTable()">
             <option value="">Todos os Parceiros</option>
           </select>
+          <select class="filter-input" id="filter-instituicao" onchange="renderPropostasTable()">
+            <option value="">Todas as Instituições</option>
+          </select>
         </div>
         <div class="table-wrap">
           <table><thead><tr>
@@ -763,7 +766,7 @@ function showView(v) {
   else if(v==='usuarios') { btn.style.display=''; btn.textContent='＋ Novo Usuário'; btn.onclick=openNewUsuario; }
   else { btn.style.display='none'; }
   if(v==='dashboard') renderDashboard();
-  if(v==='propostas') { populateParceiroFilter('filter-parceiro'); renderPropostasTable(); }
+  if(v==='propostas') { populateParceiroFilter('filter-parceiro'); populateInstituicaoFilter('filter-instituicao'); renderPropostasTable(); }
   if(v==='parceiros') renderParceirosTable();
   if(v==='instituicoes') renderInstituicoesTable();
   if(v==='comissoes') { populateParceiroFilter('com-filter-parceiro'); renderComissoes(); }
@@ -943,6 +946,13 @@ function populateParceiroFilter(selId) {
   sel.value = cur;
 }
 
+function populateInstituicaoFilter(selId) {
+  const sel = document.getElementById(selId); if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Todas as Instituições</option>' + CACHE.instituicoes.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');
+  sel.value = cur;
+}
+
 function autoFillPartnerCommission() {
   const pid = document.getElementById('p-partnerId').value;
   if(!pid) { document.getElementById('p-partnerComm').value=0; updateCommissionPreview(); return; }
@@ -1024,6 +1034,7 @@ function renderPropostasTable() {
   const fStatus = document.getElementById('filter-status').value;
   const fTipo = document.getElementById('filter-tipo').value;
   const fParceiro = document.getElementById('filter-parceiro').value;
+  const fInstituicao = document.getElementById('filter-instituicao').value;
   let list = CACHE.propostas.filter(p => {
     const par = CACHE.parceiros.find(x=>x.id===p.partnerId);
     const parName = par?par.name.toLowerCase():'';
@@ -1031,6 +1042,7 @@ function renderPropostasTable() {
     if(fStatus && p.status!==fStatus) return false;
     if(fTipo && p.loanType!==fTipo) return false;
     if(fParceiro && p.partnerId!==fParceiro) return false;
+    if(fInstituicao && p.instituicaoId!==fInstituicao) return false;
     return true;
   });
   const tbody = document.getElementById('propostas-tbody');
