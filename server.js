@@ -72,6 +72,7 @@ try { db.exec(`ALTER TABLE propostas ADD COLUMN instituicao_id TEXT DEFAULT ''`)
 try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm REAL DEFAULT 0`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm_value REAL DEFAULT 0`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN status_changed_at TEXT DEFAULT ''`); } catch(e) {}
+try { db.exec(`ALTER TABLE propostas ADD COLUMN checklist_data TEXT DEFAULT '{}'`); } catch(e) {}
 
 // History table
 db.exec(`
@@ -270,6 +271,13 @@ app.delete('/api/instituicoes/:id', auth, (req, res) => {
 // ============================================================
 app.get('/api/propostas', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM propostas ORDER BY created_at DESC').all());
+});
+
+app.put('/api/propostas/:id/checklist', auth, (req, res) => {
+  const { checklist } = req.body;
+  db.prepare('UPDATE propostas SET checklist_data=? WHERE id=?')
+    .run(JSON.stringify(checklist || {}), req.params.id);
+  res.json({ ok: true });
 });
 
 app.get('/api/propostas/:id/historico', auth, (req, res) => {

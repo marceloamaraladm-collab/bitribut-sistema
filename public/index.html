@@ -638,6 +638,33 @@ function fmt(v) { return 'R$ ' + parseFloat(v||0).toLocaleString('pt-BR',{minimu
 function pct(v,p) { return parseFloat(v||0)*parseFloat(p||0)/100; }
 
 const STATUS_PRAZOS = { 'Prospecção': 10, 'Documentação': 5 };
+
+const CHECKLIST_DOCS = [
+  { group: 'Pessoa Física (Sócios / Garantidores)', items: [
+    { key: 'pf_cnh',        label: 'CNH ou documento oficial com foto' },
+    { key: 'pf_residencia', label: 'Comprovante de residência (até 3 meses)' },
+    { key: 'pf_certidao',   label: 'Certidão de casamento ou nascimento' },
+    { key: 'pf_procuracao', label: 'Procuração (se aplicável)' },
+    { key: 'pf_irpf',       label: 'Última Declaração de IRPF + recibo' },
+  ]},
+  { group: 'Pessoa Jurídica', items: [
+    { key: 'pj_cnpj',        label: 'Cartão CNPJ atualizado' },
+    { key: 'pj_contrato',    label: 'Contrato Social e aditivos / consolidação' },
+    { key: 'pj_balanco',     label: 'Balanço e DRE — últimos 3 exercícios + vigente' },
+    { key: 'pj_endivid',     label: 'Endividamento bancário PJ (planilha padrão)' },
+    { key: 'pj_curva_abc',   label: 'Curva ABC (principais fornecedores e clientes)' },
+  ]},
+  { group: 'Imóveis dos Sócios (Home Equity — quando aplicável)', items: [
+    { key: 'he_matricula',   label: 'Matrícula atualizada do imóvel' },
+    { key: 'he_iptu',        label: 'IPTU do último exercício' },
+    { key: 'he_endereco',    label: 'Endereço completo do imóvel' },
+    { key: 'he_situacao',    label: 'Situação: quitado ou financiado' },
+    { key: 'he_uso',         label: 'Situação de uso: próprio ou alugado' },
+  ]},
+  { group: 'Procuração Limitada', items: [
+    { key: 'proc_efinanceira', label: 'Procuração eletrônica limitada para análise no e-Financeira' },
+  ]},
+];
 function atrasoTag(p) {
   const prazo = STATUS_PRAZOS[p.status];
   if (!prazo) return '';
@@ -741,7 +768,7 @@ async function initApp() {
 async function loadData() {
   try {
     const [p, par, inst] = await Promise.all([API.get('/api/propostas'), API.get('/api/parceiros'), API.get('/api/instituicoes')]);
-    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdBy: x.created_by, createdAt: x.created_at, statusChangedAt: x.status_changed_at||x.created_at }));
+    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdBy: x.created_by, createdAt: x.created_at, statusChangedAt: x.status_changed_at||x.created_at, checklistData: (() => { try { return JSON.parse(x.checklist_data||'{}'); } catch(e) { return {}; } })() }));
     CACHE.parceiros = par.map(x => ({ ...x, defaultComm: x.default_comm, createdAt: x.created_at }));
     CACHE.instituicoes = inst.map(x => ({ ...x, commBitribut: x.comm_bitribut, createdAt: x.created_at }));
     try { CACHE.users = await API.get('/api/users'); } catch(e) { /* non-admin, ignore */ }
@@ -871,6 +898,45 @@ async function deleteProposta(id) {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+function renderChecklistHTML(p) {
+  const data = p.checklistData || {};
+  const allItems = CHECKLIST_DOCS.flatMap(g => g.items);
+  const total = allItems.length;
+  const checked = allItems.filter(i => data[i.key]).length;
+  const pct = total ? Math.round(checked/total*100) : 0;
+  const groups = CHECKLIST_DOCS.map(g => `
+    <div style="margin-bottom:10px">
+      <div style="font-size:.75rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.3px;margin-bottom:5px">${g.group}</div>
+      ${g.items.map(item => `
+        <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:.875rem;border-bottom:1px solid var(--border)">
+          <input type="checkbox" ${data[item.key]?'checked':''} onchange="toggleChecklist('${p.id}','${item.key}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary)">
+          <span style="${data[item.key]?'text-decoration:line-through;color:var(--text-muted)':''}">${item.label}</span>
+        </label>`).join('')}
+    </div>`).join('');
+  return `
+    <div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">📄 Checklist de Documentos</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="flex:1;background:var(--border);border-radius:10px;height:8px;overflow:hidden">
+        <div style="width:${pct}%;background:${pct===100?'var(--success)':'var(--primary-light)'};height:100%;border-radius:10px;transition:width .3s"></div>
+      </div>
+      <span style="font-size:.8rem;font-weight:700;color:${pct===100?'var(--success)':'var(--primary)'};white-space:nowrap">${checked}/${total} documentos</span>
+    </div>
+    ${groups}`;
+}
+
+async function toggleChecklist(propostaId, itemKey, checked) {
+  const p = CACHE.propostas.find(x => x.id === propostaId);
+  if (!p) return;
+  p.checklistData = p.checklistData || {};
+  p.checklistData[itemKey] = checked;
+  try {
+    await API.put('/api/propostas/'+propostaId+'/checklist', { checklist: p.checklistData });
+    // Re-render just the checklist section without closing the modal
+    const sec = document.getElementById('checklist-section');
+    if (sec) sec.innerHTML = renderChecklistHTML(p);
+  } catch(e) { showToast('Erro ao salvar checklist', 'error'); }
+}
+
 async function viewProposta(id) {
   const p = CACHE.propostas.find(x => x.id===id); if(!p) return;
   const par = CACHE.parceiros.find(x => x.id===p.partnerId);
@@ -896,6 +962,7 @@ async function viewProposta(id) {
     </div>
     ${p.notes?`<div style="margin-bottom:18px"><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:5px">Observações</div><div style="background:var(--bg);padding:10px 12px;border-radius:7px;font-size:.875rem">${p.notes}</div></div>`:''}
     <div style="margin-bottom:18px"><div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">🔀 Linha do Tempo</div><div class="timeline">${tl}</div></div>
+    <div style="margin-bottom:18px" id="checklist-section">${renderChecklistHTML(p)}</div>
     <div id="hist-section"><div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">📋 Histórico de Alterações</div><div id="hist-list" style="font-size:.85rem;color:var(--text-muted);padding:8px 0">Carregando...</div></div>`;
   const canEdit = SESSION.user.role==='admin' || p.createdBy===SESSION.user.id;
   document.getElementById('detalhe-edit-btn').style.display = canEdit ? '' : 'none';
