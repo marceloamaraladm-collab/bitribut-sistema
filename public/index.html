@@ -150,6 +150,7 @@
   .badge-concluido { background: #e2d9f3; color: #5a3487; }
   .badge-cancelado { background: #f8d7da; color: #721c24; }
   .badge-admin { background: #fff3cd; color: #856404; }
+  .badge-executivo { background: #e8f5e9; color: #2e7d32; }
   .badge-user { background: #e8f0fe; color: #3c5a9a; }
   .badge-ativo { background: #d4edda; color: #155724; }
   .badge-inativo { background: #f8d7da; color: #721c24; }
@@ -563,6 +564,7 @@
           <div class="form-group"><label>Perfil</label>
             <select id="u-role">
               <option value="user">Usuário</option>
+              <option value="executivo">Executivo</option>
               <option value="admin">Administrador</option>
             </select>
           </div>
@@ -757,7 +759,8 @@ async function doChangePassword() {
 async function initApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('user-name-display').textContent = SESSION.user.name;
-  document.getElementById('user-role-display').textContent = SESSION.user.role === 'admin' ? '⭐ Administrador' : '👤 Usuário';
+  const roleLabels = { admin: '⭐ Administrador', executivo: '🎯 Executivo', user: '👤 Usuário' };
+  document.getElementById('user-role-display').textContent = roleLabels[SESSION.user.role] || '👤 Usuário';
   if (SESSION.user.role === 'admin') {
     document.getElementById('nav-usuarios').style.display = '';
   }
@@ -1275,7 +1278,7 @@ async function renderUsuariosTable() {
     tbody.innerHTML = users.map(u => `<tr>
       <td><strong>${u.name}</strong></td>
       <td>${u.email}</td>
-      <td><span class="badge badge-${u.role}">${u.role==='admin'?'Administrador':'Usuário'}</span></td>
+      <td><span class="badge badge-${u.role}">${{admin:'Administrador',executivo:'Executivo',user:'Usuário'}[u.role]||u.role}</span></td>
       <td><span class="badge badge-${u.active?'ativo':'inativo'}">${u.active?'Ativo':'Inativo'}</span></td>
       <td style="font-size:.78rem;color:var(--text-muted)">${new Date(u.created_at).toLocaleDateString('pt-BR')}</td>
       <td>

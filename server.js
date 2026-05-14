@@ -270,6 +270,9 @@ app.delete('/api/instituicoes/:id', auth, (req, res) => {
 //  PROPOSTAS
 // ============================================================
 app.get('/api/propostas', auth, (req, res) => {
+  if (req.user.role === 'executivo') {
+    return res.json(db.prepare('SELECT * FROM propostas WHERE created_by = ? ORDER BY created_at DESC').all(req.user.id));
+  }
   res.json(db.prepare('SELECT * FROM propostas ORDER BY created_at DESC').all());
 });
 
