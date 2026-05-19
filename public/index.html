@@ -457,10 +457,14 @@
               <option>Crédito Digital</option><option>Consignado</option><option>Antecipação de Recebíveis</option><option>BNDES/Fomento</option><option>Outro</option>
             </select>
           </div>
-          <div class="form-group"><label>Instituição Financeira</label>
-            <select id="p-institution" onchange="autoFillInstitutionCommission()">
-              <option value="">Selecione...</option>
-            </select>
+          <div class="form-group"><label>Instituição Financeira <span style="font-size:.75rem;color:var(--text-muted);font-weight:400">(pode selecionar várias)</span></label>
+            <div id="p-institution-wrap" style="position:relative">
+              <div id="p-institution-display" onclick="toggleInstDropdown()" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;cursor:pointer;background:#fff;min-height:38px;display:flex;align-items:center;justify-content:space-between;font-size:.9rem">
+                <span id="p-institution-label" style="color:var(--text-muted)">Selecione...</span>
+                <span style="color:var(--text-muted)">▾</span>
+              </div>
+              <div id="p-institution-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:200;max-height:220px;overflow-y:auto;margin-top:2px" id="p-inst-dd"></div>
+            </div>
           </div>
           <div class="form-group"><label>Valor Solicitado (R$) *</label><input type="number" id="p-loanValue" required min="0" step="0.01" oninput="updateCommissionPreview()"></div>
           <div class="form-group"><label>Status *</label>
@@ -829,7 +833,7 @@ function openNewProposta() {
   document.getElementById('p-partnerComm').value = 0;
   document.getElementById('p-bitributComm').value = 0;
   populateParceiroSelectInForm();
-  populateInstituicaoSelectInForm();
+  populateInstituicaoSelectInForm(null);
   updateCommissionPreview();
   openModal('modal-proposta');
 }
@@ -839,13 +843,12 @@ function editProposta(id) {
   if(!p) return;
   document.getElementById('modal-proposta-title').textContent = 'Editar Proposta';
   populateParceiroSelectInForm();
-  populateInstituicaoSelectInForm();
+  populateInstituicaoSelectInForm(p.instituicaoId);
   document.getElementById('p-clientName').value = p.clientName;
   document.getElementById('p-clientCpfCnpj').value = p.clientCpfCnpj || '';
   document.getElementById('p-clientPhone').value = p.clientPhone || '';
   document.getElementById('p-clientEmail').value = p.clientEmail || '';
   document.getElementById('p-loanType').value = p.loanType || '';
-  document.getElementById('p-institution').value = p.instituicaoId || '';
   document.getElementById('p-loanValue').value = p.loanValue;
   document.getElementById('p-status').value = p.status;
   document.getElementById('p-partnerId').value = p.partnerId || '';
@@ -862,31 +865,40 @@ async function saveProposta(e) {
   const lv = parseFloat(document.getElementById('p-loanValue').value) || 0;
   const pc = parseFloat(document.getElementById('p-partnerComm').value) || 0;
   const bc = parseFloat(document.getElementById('p-bitributComm').value) || 0;
-  const iid = document.getElementById('p-institution').value;
-  const instObj = CACHE.instituicoes.find(x=>x.id===iid);
-  const ic = instObj ? instObj.commBitribut : 0;
-  const body = {
+  const id = document.getElementById('p-id').value;
+  const baseBody = {
     clientName: document.getElementById('p-clientName').value.trim(),
     clientCpfCnpj: document.getElementById('p-clientCpfCnpj').value.trim(),
     clientPhone: document.getElementById('p-clientPhone').value.trim(),
     clientEmail: document.getElementById('p-clientEmail').value.trim(),
     loanType: document.getElementById('p-loanType').value,
-    instituicaoId: iid,
-    institution: instObj ? instObj.name : '',
     loanValue: lv, status: document.getElementById('p-status').value,
     partnerId: document.getElementById('p-partnerId').value,
-    partnerComm: pc, bitributComm: bc, instComm: ic,
-    partnerCommValue: pct(lv,pc), bitributCommValue: pct(lv,bc), instCommValue: pct(lv,ic),
-    totalCommValue: pct(lv,pc)+pct(lv,bc)+pct(lv,ic),
+    partnerComm: pc, bitributComm: bc,
+    partnerCommValue: pct(lv,pc), bitributCommValue: pct(lv,bc),
     notes: document.getElementById('p-notes').value.trim(),
   };
-  const id = document.getElementById('p-id').value;
   try {
-    if(id) { await API.put('/api/propostas/'+id, body); }
-    else { await API.post('/api/propostas', body); }
+    if(id) {
+      // Editing: single institution (use first selected or none)
+      const insts = getSelectedInstituicoes();
+      const instObj = insts[0] || null;
+      const ic = instObj ? instObj.commBitribut : 0;
+      const body = { ...baseBody, instituicaoId: instObj?instObj.id:'', institution: instObj?instObj.name:'', instComm: ic, instCommValue: pct(lv,ic), totalCommValue: pct(lv,pc)+pct(lv,bc)+pct(lv,ic) };
+      await API.put('/api/propostas/'+id, body);
+      showToast('Proposta atualizada!', 'success');
+    } else {
+      // Creating: one proposal per selected institution
+      const insts = getSelectedInstituicoes();
+      const list = insts.length ? insts : [null];
+      await Promise.all(list.map(instObj => {
+        const ic = instObj ? instObj.commBitribut : 0;
+        return API.post('/api/propostas', { ...baseBody, instituicaoId: instObj?instObj.id:'', institution: instObj?instObj.name:'', instComm: ic, instCommValue: pct(lv,ic), totalCommValue: pct(lv,pc)+pct(lv,bc)+pct(lv,ic) });
+      }));
+      showToast(list.length > 1 ? `${list.length} propostas criadas (${list.map(i=>i?i.name:'Sem instituição').join(', ')})!` : 'Proposta criada!', 'success');
+    }
     await loadData();
     closeModal('modal-proposta');
-    showToast(id ? 'Proposta atualizada!' : 'Proposta criada!', 'success');
     renderDashboard(); renderPropostasTable();
   } catch(e) { showToast(e.message, 'error'); }
 }
@@ -991,8 +1003,8 @@ function updateCommissionPreview() {
   const v = parseFloat(document.getElementById('p-loanValue').value)||0;
   const pc = parseFloat(document.getElementById('p-partnerComm').value)||0;
   const bc = parseFloat(document.getElementById('p-bitributComm').value)||0;
-  const iid = document.getElementById('p-institution').value;
-  const inst = CACHE.instituicoes.find(x=>x.id===iid);
+  const insts = getSelectedInstituicoes ? getSelectedInstituicoes() : [];
+  const inst = insts[0] || null;
   const ic = inst ? inst.commBitribut : 0;
   document.getElementById('prev-loan').textContent = fmt(v);
   document.getElementById('prev-partner').textContent = fmt(pct(v,pc));
@@ -1030,11 +1042,36 @@ function autoFillPartnerCommission() {
   if(p) { document.getElementById('p-partnerComm').value = p.defaultComm; updateCommissionPreview(); }
 }
 
-function populateInstituicaoSelectInForm() {
-  const sel = document.getElementById('p-institution');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">Selecione...</option>' + CACHE.instituicoes.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');
-  sel.value = cur;
+function populateInstituicaoSelectInForm(selectedId) {
+  const dd = document.getElementById('p-inst-dd') || document.getElementById('p-institution-dropdown');
+  if(!dd) return;
+  dd.innerHTML = CACHE.instituicoes.map(i=>`
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;font-size:.875rem;border-bottom:1px solid var(--border);hover:background:var(--bg)">
+      <input type="checkbox" value="${i.id}" data-name="${i.name}" onchange="updateInstLabel()" style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer" ${selectedId===i.id?'checked':''}>
+      <span>${i.name}</span>
+    </label>`).join('');
+  updateInstLabel();
+}
+
+function toggleInstDropdown() {
+  const dd = document.getElementById('p-institution-dropdown');
+  if(!dd) return;
+  dd.style.display = dd.style.display==='none' ? 'block' : 'none';
+}
+
+function updateInstLabel() {
+  const checked = [...document.querySelectorAll('#p-institution-dropdown input[type=checkbox]:checked')];
+  const label = document.getElementById('p-institution-label');
+  if(!label) return;
+  if(!checked.length) { label.textContent='Selecione...'; label.style.color='var(--text-muted)'; }
+  else { label.textContent = checked.map(c=>c.dataset.name).join(', '); label.style.color='var(--text)'; }
+  // update commission preview using first selected
+  updateCommissionPreview();
+}
+
+function getSelectedInstituicoes() {
+  return [...document.querySelectorAll('#p-institution-dropdown input[type=checkbox]:checked')]
+    .map(c => CACHE.instituicoes.find(i=>i.id===c.value)).filter(Boolean);
 }
 
 function autoFillInstitutionCommission() {
@@ -1385,6 +1422,15 @@ function renderComissoes() {
   }).join('');
   tbody.innerHTML += `<tr class="summary-row"><td colspan="2" style="font-weight:800">TOTAL</td><td style="font-weight:800">${fmt(totV)}</td><td>—</td><td>—</td><td style="color:var(--accent-dark);font-weight:800">${fmt(totP)}</td><td>—</td><td style="color:var(--success);font-weight:800">${fmt(totBagc)}</td><td>—</td><td style="color:#0099cc;font-weight:800">${fmt(totBinst)}</td><td style="font-weight:800;color:var(--primary)">${fmt(totB)}</td><td>—</td></tr>`;
 }
+
+// Close institution dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('p-institution-wrap');
+  if(wrap && !wrap.contains(e.target)) {
+    const dd = document.getElementById('p-institution-dropdown');
+    if(dd) dd.style.display = 'none';
+  }
+});
 
 // ============================================================
 //  INIT
