@@ -69,6 +69,8 @@ db.exec(`
 
 // Add columns to existing databases (safe migrations)
 try { db.exec(`ALTER TABLE propostas ADD COLUMN instituicao_id TEXT DEFAULT ''`); } catch(e) {}
+// Corrige status com espaços extras (ex: "Liberado " → "Liberado")
+try { db.exec(`UPDATE propostas SET status = TRIM(status) WHERE status != TRIM(status)`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm REAL DEFAULT 0`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm_value REAL DEFAULT 0`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN status_changed_at TEXT DEFAULT ''`); } catch(e) {}
@@ -298,7 +300,7 @@ app.post('/api/propostas', auth, (req, res) => {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(id, p.clientName, p.clientCpfCnpj || '', p.clientPhone || '', p.clientEmail || '',
       p.loanType || '', p.institution || '', p.instituicaoId || '',
-      p.loanValue || 0, p.status || 'Prospecção',
+      p.loanValue || 0, (p.status || 'Prospecção').trim(),
       p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0, p.instComm || 0,
       p.partnerCommValue || 0, p.bitributCommValue || 0, p.instCommValue || 0, p.totalCommValue || 0,
       p.notes || '', req.user.id, now, now, now);
@@ -324,7 +326,7 @@ app.put('/api/propostas/:id', auth, (req, res) => {
     bitribut_comm_value=?,inst_comm_value=?,total_comm_value=?,notes=?,updated_at=?,status_changed_at=? WHERE id=?`)
     .run(p.clientName, p.clientCpfCnpj || '', p.clientPhone || '', p.clientEmail || '',
       p.loanType || '', p.institution || '', p.instituicaoId || '',
-      p.loanValue || 0, p.status,
+      p.loanValue || 0, (p.status || '').trim(),
       p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0, p.instComm || 0,
       p.partnerCommValue || 0, p.bitributCommValue || 0, p.instCommValue || 0, p.totalCommValue || 0,
       p.notes || '', now, statusChanged ? now : (before?.status_changed_at || now), req.params.id);
