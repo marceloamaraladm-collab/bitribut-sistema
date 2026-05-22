@@ -69,8 +69,10 @@ db.exec(`
 
 // Add columns to existing databases (safe migrations)
 try { db.exec(`ALTER TABLE propostas ADD COLUMN instituicao_id TEXT DEFAULT ''`); } catch(e) {}
-// Corrige status com espaços extras (ex: "Liberado " → "Liberado")
+// Corrige status com espaços extras e caixa incorreta
 try { db.exec(`UPDATE propostas SET status = TRIM(status) WHERE status != TRIM(status)`); } catch(e) {}
+try { db.exec(`UPDATE propostas SET status = 'Liberado' WHERE LOWER(TRIM(status)) = 'liberado'`); } catch(e) {}
+try { db.exec(`UPDATE propostas SET status = 'Concluído' WHERE LOWER(TRIM(status)) IN ('concluído','concluido')`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm REAL DEFAULT 0`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm_value REAL DEFAULT 0`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN status_changed_at TEXT DEFAULT ''`); } catch(e) {}

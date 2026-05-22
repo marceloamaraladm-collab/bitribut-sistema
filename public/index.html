@@ -1332,7 +1332,7 @@ function renderDashboard() {
   const all = CACHE.propostas;
   const ativas = all.filter(p=>p.status!=='Cancelado'&&p.status!=='Declinado'&&p.status!=='Ajuizar Mandato');
   const totalVol = ativas.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
-  const liberados = all.filter(p=>{const s=(p.status||'').trim();return s==='Liberado'||s==='Concluído';});
+  const liberados = all.filter(p=>{const s=(p.status||'').trim().toLowerCase();return s==='liberado'||s==='concluído'||s==='concluido';});
   const volLib = liberados.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
   const totBitribut = ativas.reduce((a,p)=>a+parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0),0);
   const totParceiro = ativas.reduce((a,p)=>a+parseFloat(p.partnerCommValue||0),0);
@@ -1395,7 +1395,7 @@ function renderComissoes() {
   const totB = totBagc + totBinst;
   const totP = list.reduce((a,p)=>a+parseFloat(p.partnerCommValue||0),0);
   const totV = list.reduce((a,p)=>a+parseFloat(p.loanValue||0),0);
-  const libB = list.filter(p=>{const s=(p.status||'').trim();return s==='Liberado'||s==='Concluído';}).reduce((a,p)=>a+parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0),0);
+  const libB = list.filter(p=>{const s=(p.status||'').trim().toLowerCase();return s==='liberado'||s==='concluído'||s==='concluido';}).reduce((a,p)=>a+parseFloat(p.bitributCommValue||0)+parseFloat(p.instCommValue||0),0);
   document.getElementById('kpi-comissoes').innerHTML = `
     <div class="kpi-card purple" style="border-left-width:6px"><div class="kpi-label">Comissão Bitribut (Total)</div><div class="kpi-value" style="font-size:1.35rem">${fmt(totB)}</div><div class="kpi-sub">AGC ${fmt(totBagc)} + Instituição ${fmt(totBinst)}</div></div>
     <div class="kpi-card green"><div class="kpi-label">Comissão AGC (Bitribut)</div><div class="kpi-value" style="font-size:1.2rem">${fmt(totBagc)}</div><div class="kpi-sub">${fmt(libB)} já liberado</div></div>
