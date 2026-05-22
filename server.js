@@ -351,6 +351,19 @@ app.delete('/api/propostas/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Endpoint temporário de debug — remover após diagnóstico
+app.get('/api/debug/liberados', auth, adminOnly, (req, res) => {
+  const rows = db.prepare(`SELECT id, client_name, status, bitribut_comm_value, inst_comm_value, partner_comm_value FROM propostas ORDER BY created_at DESC`).all();
+  res.json(rows.map(r => ({
+    nome: r.client_name,
+    status: r.status,
+    statusHex: Buffer.from(r.status || '').toString('hex'),
+    bitributComm: r.bitribut_comm_value,
+    instComm: r.inst_comm_value,
+    partnerComm: r.partner_comm_value
+  })));
+});
+
 // ============================================================
 //  START SERVER
 // ============================================================
