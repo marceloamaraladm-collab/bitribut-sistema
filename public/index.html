@@ -569,6 +569,7 @@
             <select id="u-role">
               <option value="user">Usuário</option>
               <option value="executivo">Executivo</option>
+              <option value="parceiro comercial">Parceiro Comercial</option>
               <option value="admin">Administrador</option>
             </select>
           </div>
@@ -763,7 +764,7 @@ async function doChangePassword() {
 async function initApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('user-name-display').textContent = SESSION.user.name;
-  const roleLabels = { admin: '⭐ Administrador', executivo: '🎯 Executivo', user: '👤 Usuário' };
+  const roleLabels = { admin: '⭐ Administrador', executivo: '🎯 Executivo', user: '👤 Usuário', 'parceiro comercial': '👁 Parceiro Comercial' };
   document.getElementById('user-role-display').textContent = roleLabels[SESSION.user.role] || '👤 Usuário';
   if (SESSION.user.role === 'admin') {
     document.getElementById('nav-usuarios').style.display = '';
@@ -795,7 +796,9 @@ function showView(v) {
   if(navEl) navEl.classList.add('active');
   document.getElementById('topbar-title').textContent = TITLES[v];
   const btn = document.getElementById('topbar-action');
-  if(v==='propostas'||v==='dashboard') { btn.style.display=''; btn.textContent='＋ Nova Proposta'; btn.onclick=openNewProposta; }
+  const isReadOnly = SESSION.user.role === 'parceiro comercial';
+  if(isReadOnly) { btn.style.display='none'; }
+  else if(v==='propostas'||v==='dashboard') { btn.style.display=''; btn.textContent='＋ Nova Proposta'; btn.onclick=openNewProposta; }
   else if(v==='parceiros') { btn.style.display=''; btn.textContent='＋ Novo Parceiro'; btn.onclick=openNewParceiro; }
   else if(v==='usuarios') { btn.style.display=''; btn.textContent='＋ Novo Usuário'; btn.onclick=openNewUsuario; }
   else { btn.style.display='none'; }
@@ -979,7 +982,7 @@ async function viewProposta(id) {
     <div style="margin-bottom:18px"><div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">🔀 Linha do Tempo</div><div class="timeline">${tl}</div></div>
     <div style="margin-bottom:18px" id="checklist-section">${renderChecklistHTML(p)}</div>
     <div id="hist-section"><div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">📋 Histórico de Alterações</div><div id="hist-list" style="font-size:.85rem;color:var(--text-muted);padding:8px 0">Carregando...</div></div>`;
-  const canEdit = SESSION.user.role==='admin' || p.createdBy===SESSION.user.id;
+  const canEdit = SESSION.user.role==='admin' || (SESSION.user.role!=='parceiro comercial' && p.createdBy===SESSION.user.id);
   document.getElementById('detalhe-edit-btn').style.display = canEdit ? '' : 'none';
   document.getElementById('detalhe-edit-btn').onclick = () => { closeModal('modal-detalhe'); editProposta(id); };
   openModal('modal-detalhe');
@@ -1091,7 +1094,7 @@ function renderInstituicoesTable() {
       <td>${props.length}</td>
       <td>${fmt(vol)}</td>
       <td style="color:var(--success);font-weight:700">${fmt(comm)}</td>
-      <td><button class="btn btn-sm btn-outline" onclick="editInstituicao('${inst.id}')">✏️</button> <button class="btn btn-sm btn-outline" style="color:var(--danger)" onclick="deleteInstituicao('${inst.id}')">🗑️</button></td>
+      <td>${SESSION.user.role!=='parceiro comercial'?`<button class="btn btn-sm btn-outline" onclick="editInstituicao('${inst.id}')">✏️</button> <button class="btn btn-sm btn-outline" style="color:var(--danger)" onclick="deleteInstituicao('${inst.id}')">🗑️</button>`:''}</td>
     </tr>`;
   }).join('');
 }
@@ -1244,8 +1247,7 @@ function renderParceirosTable() {
       <td>${fmt(vol)}</td>
       <td style="color:var(--accent-dark);font-weight:700">${fmt(com)}</td>
       <td>
-        <button class="btn btn-outline btn-sm" onclick="editParceiro('${p.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteParceiro('${p.id}')">🗑️</button>
+        ${SESSION.user.role!=='parceiro comercial'?`<button class="btn btn-outline btn-sm" onclick="editParceiro('${p.id}')">✏️</button><button class="btn btn-danger btn-sm" onclick="deleteParceiro('${p.id}')">🗑️</button>`:''}
       </td></tr>`;
   }).join('');
 }

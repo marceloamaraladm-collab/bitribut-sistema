@@ -127,6 +127,11 @@ function adminOnly(req, res, next) {
   next();
 }
 
+function readOnly(req, res, next) {
+  if (req.user.role === 'parceiro comercial') return res.status(403).json({ error: 'Perfil somente leitura.' });
+  next();
+}
+
 // ============================================================
 //  AUTH ROUTES
 // ============================================================
@@ -221,7 +226,7 @@ app.get('/api/parceiros', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM parceiros ORDER BY name').all());
 });
 
-app.post('/api/parceiros', auth, (req, res) => {
+app.post('/api/parceiros', auth, readOnly, (req, res) => {
   const { name, cpfcnpj, phone, email, defaultComm } = req.body;
   if (!name) return res.status(400).json({ error: 'Nome é obrigatório' });
   const id = uid();
@@ -230,14 +235,14 @@ app.post('/api/parceiros', auth, (req, res) => {
   res.json({ id, name, cpfcnpj: cpfcnpj || '', phone: phone || '', email: email || '', default_comm: defaultComm || 0 });
 });
 
-app.put('/api/parceiros/:id', auth, (req, res) => {
+app.put('/api/parceiros/:id', auth, readOnly, (req, res) => {
   const { name, cpfcnpj, phone, email, defaultComm } = req.body;
   db.prepare('UPDATE parceiros SET name=?, cpfcnpj=?, phone=?, email=?, default_comm=? WHERE id=?')
     .run(name, cpfcnpj || '', phone || '', email || '', defaultComm || 0, req.params.id);
   res.json({ ok: true });
 });
 
-app.delete('/api/parceiros/:id', auth, (req, res) => {
+app.delete('/api/parceiros/:id', auth, readOnly, (req, res) => {
   db.prepare('DELETE FROM parceiros WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -249,7 +254,7 @@ app.get('/api/instituicoes', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM instituicoes ORDER BY name').all());
 });
 
-app.post('/api/instituicoes', auth, (req, res) => {
+app.post('/api/instituicoes', auth, readOnly, (req, res) => {
   const { name, commBitribut } = req.body;
   if (!name) return res.status(400).json({ error: 'Nome é obrigatório' });
   const id = uid();
@@ -258,14 +263,14 @@ app.post('/api/instituicoes', auth, (req, res) => {
   res.json({ id, name, comm_bitribut: commBitribut || 0 });
 });
 
-app.put('/api/instituicoes/:id', auth, (req, res) => {
+app.put('/api/instituicoes/:id', auth, readOnly, (req, res) => {
   const { name, commBitribut } = req.body;
   db.prepare('UPDATE instituicoes SET name=?, comm_bitribut=? WHERE id=?')
     .run(name, commBitribut || 0, req.params.id);
   res.json({ ok: true });
 });
 
-app.delete('/api/instituicoes/:id', auth, (req, res) => {
+app.delete('/api/instituicoes/:id', auth, readOnly, (req, res) => {
   db.prepare('DELETE FROM instituicoes WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -280,7 +285,7 @@ app.get('/api/propostas', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM propostas ORDER BY created_at DESC').all());
 });
 
-app.put('/api/propostas/:id/checklist', auth, (req, res) => {
+app.put('/api/propostas/:id/checklist', auth, readOnly, (req, res) => {
   const { checklist } = req.body;
   db.prepare('UPDATE propostas SET checklist_data=? WHERE id=?')
     .run(JSON.stringify(checklist || {}), req.params.id);
@@ -291,7 +296,7 @@ app.get('/api/propostas/:id/historico', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM proposta_historico WHERE proposta_id = ? ORDER BY created_at ASC').all(req.params.id));
 });
 
-app.post('/api/propostas', auth, (req, res) => {
+app.post('/api/propostas', auth, readOnly, (req, res) => {
   const p = req.body;
   const id = uid();
   const now = new Date().toISOString();
@@ -311,7 +316,7 @@ app.post('/api/propostas', auth, (req, res) => {
   res.json({ id });
 });
 
-app.put('/api/propostas/:id', auth, (req, res) => {
+app.put('/api/propostas/:id', auth, readOnly, (req, res) => {
   if (req.user.role !== 'admin') {
     const existing = db.prepare('SELECT created_by FROM propostas WHERE id = ?').get(req.params.id);
     if (!existing || existing.created_by !== req.user.id) {
@@ -340,7 +345,7 @@ app.put('/api/propostas/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/propostas/:id', auth, (req, res) => {
+app.delete('/api/propostas/:id', auth, readOnly, (req, res) => {
   if (req.user.role !== 'admin') {
     const existing = db.prepare('SELECT created_by FROM propostas WHERE id = ?').get(req.params.id);
     if (!existing || existing.created_by !== req.user.id) {
