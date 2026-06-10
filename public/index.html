@@ -449,6 +449,20 @@
           <div class="form-group"><label>CPF / CNPJ *</label><input type="text" id="p-clientCpfCnpj" required></div>
           <div class="form-group"><label>Telefone</label><input type="text" id="p-clientPhone"></div>
           <div class="form-group"><label>E-mail</label><input type="email" id="p-clientEmail"></div>
+          <div class="form-group"><label>Cidade</label><input type="text" id="p-clientCity"></div>
+          <div class="form-group"><label>Estado</label>
+            <select id="p-clientState">
+              <option value="">Selecione...</option>
+              <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+              <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+              <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+              <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+              <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+              <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+              <option>SP</option><option>SE</option><option>TO</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Faturamento Médio Mensal (R$)</label><input type="number" id="p-clientAvgRevenue" min="0" step="0.01"></div>
           <div class="section-divider">💳 Dados do Empréstimo</div>
           <div class="form-group"><label>Tipo de Crédito *</label>
             <select id="p-loanType" required>
@@ -776,7 +790,7 @@ async function initApp() {
 async function loadData() {
   try {
     const [p, par, inst] = await Promise.all([API.get('/api/propostas'), API.get('/api/parceiros'), API.get('/api/instituicoes')]);
-    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdBy: x.created_by, createdAt: x.created_at, statusChangedAt: x.status_changed_at||x.created_at, checklistData: (() => { try { return JSON.parse(x.checklist_data||'{}'); } catch(e) { return {}; } })() }));
+    CACHE.propostas = p.map(x => ({ ...x, loanValue: x.loan_value, loanType: x.loan_type, clientName: x.client_name, clientCpfCnpj: x.client_cpfcnpj, clientPhone: x.client_phone, clientEmail: x.client_email, clientCity: x.client_city||'', clientState: x.client_state||'', clientAvgRevenue: x.client_avg_revenue||0, institution: x.institution, instituicaoId: x.instituicao_id, status: x.status, partnerId: x.partner_id, partnerComm: x.partner_comm, bitributComm: x.bitribut_comm, instComm: x.inst_comm||0, partnerCommValue: x.partner_comm_value, bitributCommValue: x.bitribut_comm_value, instCommValue: x.inst_comm_value||0, totalCommValue: x.total_comm_value, notes: x.notes, createdBy: x.created_by, createdAt: x.created_at, statusChangedAt: x.status_changed_at||x.created_at, checklistData: (() => { try { return JSON.parse(x.checklist_data||'{}'); } catch(e) { return {}; } })() }));
     CACHE.parceiros = par.map(x => ({ ...x, defaultComm: x.default_comm, createdAt: x.created_at }));
     CACHE.instituicoes = inst.map(x => ({ ...x, commBitribut: x.comm_bitribut, createdAt: x.created_at }));
     try { CACHE.users = await API.get('/api/users'); } catch(e) { /* non-admin, ignore */ }
@@ -851,6 +865,9 @@ function editProposta(id) {
   document.getElementById('p-clientCpfCnpj').value = p.clientCpfCnpj || '';
   document.getElementById('p-clientPhone').value = p.clientPhone || '';
   document.getElementById('p-clientEmail').value = p.clientEmail || '';
+  document.getElementById('p-clientCity').value = p.clientCity || '';
+  document.getElementById('p-clientState').value = p.clientState || '';
+  document.getElementById('p-clientAvgRevenue').value = p.clientAvgRevenue || '';
   document.getElementById('p-loanType').value = p.loanType || '';
   document.getElementById('p-loanValue').value = p.loanValue;
   document.getElementById('p-status').value = p.status;
@@ -874,6 +891,9 @@ async function saveProposta(e) {
     clientCpfCnpj: document.getElementById('p-clientCpfCnpj').value.trim(),
     clientPhone: document.getElementById('p-clientPhone').value.trim(),
     clientEmail: document.getElementById('p-clientEmail').value.trim(),
+    clientCity: document.getElementById('p-clientCity').value.trim(),
+    clientState: document.getElementById('p-clientState').value,
+    clientAvgRevenue: parseFloat(document.getElementById('p-clientAvgRevenue').value) || 0,
     loanType: document.getElementById('p-loanType').value,
     loanValue: lv, status: document.getElementById('p-status').value,
     partnerId: document.getElementById('p-partnerId').value,
@@ -966,6 +986,8 @@ async function viewProposta(id) {
       <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">CPF/CNPJ</div>${p.clientCpfCnpj||'—'}</div>
       <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Telefone</div>${p.clientPhone||'—'}</div>
       <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">E-mail</div>${p.clientEmail||'—'}</div>
+      <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Cidade / Estado</div>${p.clientCity||(p.clientState?'':'')}${p.clientCity&&p.clientState?p.clientCity+' / '+p.clientState:p.clientCity||p.clientState||'—'}</div>
+      <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Fat. Médio Mensal</div>${p.clientAvgRevenue?fmt(p.clientAvgRevenue):'—'}</div>
       <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Tipo</div>${p.loanType||'—'}</div>
       <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Instituição</div>${p.institution||'—'}</div>
       <div><div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;margin-bottom:2px">Valor</div><span style="font-size:1.2rem;font-weight:800;color:var(--primary)">${fmt(p.loanValue)}</span></div>

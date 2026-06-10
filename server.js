@@ -77,6 +77,9 @@ try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm REAL DEFAULT 0`); } ca
 try { db.exec(`ALTER TABLE propostas ADD COLUMN inst_comm_value REAL DEFAULT 0`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN status_changed_at TEXT DEFAULT ''`); } catch(e) {}
 try { db.exec(`ALTER TABLE propostas ADD COLUMN checklist_data TEXT DEFAULT '{}'`); } catch(e) {}
+try { db.exec(`ALTER TABLE propostas ADD COLUMN client_city TEXT DEFAULT ''`); } catch(e) {}
+try { db.exec(`ALTER TABLE propostas ADD COLUMN client_state TEXT DEFAULT ''`); } catch(e) {}
+try { db.exec(`ALTER TABLE propostas ADD COLUMN client_avg_revenue REAL DEFAULT 0`); } catch(e) {}
 
 // History table
 db.exec(`
@@ -301,11 +304,13 @@ app.post('/api/propostas', auth, readOnly, (req, res) => {
   const id = uid();
   const now = new Date().toISOString();
   db.prepare(`INSERT INTO propostas
-    (id,client_name,client_cpfcnpj,client_phone,client_email,loan_type,institution,instituicao_id,
+    (id,client_name,client_cpfcnpj,client_phone,client_email,client_city,client_state,client_avg_revenue,
+     loan_type,institution,instituicao_id,
      loan_value,status,partner_id,partner_comm,bitribut_comm,inst_comm,partner_comm_value,
      bitribut_comm_value,inst_comm_value,total_comm_value,notes,created_by,created_at,updated_at,status_changed_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(id, p.clientName, p.clientCpfCnpj || '', p.clientPhone || '', p.clientEmail || '',
+      p.clientCity || '', p.clientState || '', p.clientAvgRevenue || 0,
       p.loanType || '', p.institution || '', p.instituicaoId || '',
       p.loanValue || 0, (p.status || 'Prospecção').trim(),
       p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0, p.instComm || 0,
@@ -328,10 +333,12 @@ app.put('/api/propostas/:id', auth, readOnly, (req, res) => {
   const before = db.prepare('SELECT status, status_changed_at FROM propostas WHERE id = ?').get(req.params.id);
   const statusChanged = before && before.status !== p.status;
   db.prepare(`UPDATE propostas SET
-    client_name=?,client_cpfcnpj=?,client_phone=?,client_email=?,loan_type=?,institution=?,instituicao_id=?,
+    client_name=?,client_cpfcnpj=?,client_phone=?,client_email=?,client_city=?,client_state=?,client_avg_revenue=?,
+    loan_type=?,institution=?,instituicao_id=?,
     loan_value=?,status=?,partner_id=?,partner_comm=?,bitribut_comm=?,inst_comm=?,partner_comm_value=?,
     bitribut_comm_value=?,inst_comm_value=?,total_comm_value=?,notes=?,updated_at=?,status_changed_at=? WHERE id=?`)
     .run(p.clientName, p.clientCpfCnpj || '', p.clientPhone || '', p.clientEmail || '',
+      p.clientCity || '', p.clientState || '', p.clientAvgRevenue || 0,
       p.loanType || '', p.institution || '', p.instituicaoId || '',
       p.loanValue || 0, (p.status || '').trim(),
       p.partnerId || '', p.partnerComm || 0, p.bitributComm || 0, p.instComm || 0,
