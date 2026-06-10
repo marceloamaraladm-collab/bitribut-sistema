@@ -345,6 +345,17 @@
           <select class="filter-input" id="filter-instituicao" onchange="renderPropostasTable()">
             <option value="">Todas as Instituições</option>
           </select>
+          <input type="text" class="filter-input" id="filter-cidade" placeholder="🏙️ Cidade..." oninput="renderPropostasTable()">
+          <select class="filter-input" id="filter-estado" onchange="renderPropostasTable()">
+            <option value="">Todos os Estados</option>
+            <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+            <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+            <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+            <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+            <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+            <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+            <option>SP</option><option>SE</option><option>TO</option>
+          </select>
         </div>
         <div class="table-wrap">
           <table><thead><tr>
@@ -1167,6 +1178,8 @@ function renderPropostasTable() {
   const fTipo = document.getElementById('filter-tipo').value;
   const fParceiro = document.getElementById('filter-parceiro').value;
   const fInstituicao = document.getElementById('filter-instituicao').value;
+  const fCidade = document.getElementById('filter-cidade').value.toLowerCase();
+  const fEstado = document.getElementById('filter-estado').value;
   let list = CACHE.propostas.filter(p => {
     const par = CACHE.parceiros.find(x=>x.id===p.partnerId);
     const parName = par?par.name.toLowerCase():'';
@@ -1175,6 +1188,8 @@ function renderPropostasTable() {
     if(fTipo && p.loanType!==fTipo) return false;
     if(fParceiro && p.partnerId!==fParceiro) return false;
     if(fInstituicao && p.instituicaoId!==fInstituicao) return false;
+    if(fCidade && !(p.clientCity||'').toLowerCase().includes(fCidade)) return false;
+    if(fEstado && p.clientState!==fEstado) return false;
     return true;
   });
   const tbody = document.getElementById('propostas-tbody');
