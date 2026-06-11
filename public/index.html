@@ -493,7 +493,7 @@
           </div>
           <div class="form-group"><label>Valor Solicitado (R$) *</label><input type="number" id="p-loanValue" required min="0" step="0.01" oninput="updateCommissionPreview()"></div>
           <div class="form-group"><label>Status *</label>
-            <select id="p-status" required>
+            <select id="p-status" required onchange="onStatusChange()">
               <option>Prospecção</option><option>Documentação</option><option>Análise de Crédito</option>
               <option>Aprovação</option><option>Contratação</option><option>Liberado</option>
               <option>Concluído</option><option>Cancelado</option><option>Declinado</option><option>Ajuizar Mandato</option>
@@ -517,6 +517,19 @@
           </div>
           <div class="section-divider">📝 Observações</div>
           <div class="form-group full"><label>Notas</label><textarea id="p-notes"></textarea></div>
+          <div id="form-checklist-wrap" style="display:none;grid-column:1/-1">
+            <div class="section-divider">📄 Documentos Recebidos</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+              <div style="flex:1;background:var(--border);border-radius:10px;height:8px;overflow:hidden">
+                <div id="form-cl-bar" style="width:0%;background:var(--primary-light);height:100%;border-radius:10px;transition:width .3s"></div>
+              </div>
+              <span id="form-cl-pct" style="font-size:.8rem;font-weight:700;color:var(--primary);white-space:nowrap">0/0 documentos</span>
+            </div>
+            <div id="form-checklist-body"></div>
+            <div style="margin-top:12px">
+              <button type="button" class="btn btn-outline btn-sm" onclick="printMissingDocsFromForm()">🖨️ Imprimir documentos pendentes</button>
+            </div>
+          </div>
           <input type="hidden" id="p-id">
         </div>
       </form>
@@ -625,6 +638,7 @@
     <div class="modal-body" id="detalhe-body"></div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-detalhe')">Fechar</button>
+      <button class="btn btn-outline" id="detalhe-print-btn">🖨️ Imprimir pendências</button>
       <button class="btn btn-primary" id="detalhe-edit-btn">✏️ Editar</button>
     </div>
   </div>
@@ -860,6 +874,8 @@ function openNewProposta() {
   document.getElementById('p-id').value = '';
   document.getElementById('p-partnerComm').value = 0;
   document.getElementById('p-bitributComm').value = 0;
+  formChecklistData = {};
+  document.getElementById('form-checklist-wrap').style.display = 'none';
   populateParceiroSelectInForm();
   populateInstituicaoSelectInForm(null);
   updateCommissionPreview();
@@ -879,6 +895,9 @@ function editProposta(id) {
   document.getElementById('p-clientCity').value = p.clientCity || '';
   document.getElementById('p-clientState').value = p.clientState || '';
   document.getElementById('p-clientAvgRevenue').value = p.clientAvgRevenue || '';
+  formChecklistData = Object.assign({}, p.checklistData || {});
+  const wrap = document.getElementById('form-checklist-wrap');
+  if (STATUSES_SHOW_DOCS.includes(p.status)) { wrap.style.display = ''; renderFormChecklist(); } else { wrap.style.display = 'none'; }
   document.getElementById('p-loanType').value = p.loanType || '';
   document.getElementById('p-loanValue').value = p.loanValue;
   document.getElementById('p-status').value = p.status;
@@ -905,6 +924,7 @@ async function saveProposta(e) {
     clientCity: document.getElementById('p-clientCity').value.trim(),
     clientState: document.getElementById('p-clientState').value,
     clientAvgRevenue: parseFloat(document.getElementById('p-clientAvgRevenue').value) || 0,
+    checklistData: JSON.stringify(formChecklistData),
     loanType: document.getElementById('p-loanType').value,
     loanValue: lv, status: document.getElementById('p-status').value,
     partnerId: document.getElementById('p-partnerId').value,
@@ -945,6 +965,99 @@ async function deleteProposta(id) {
     showToast('Proposta removida', 'success');
     renderPropostasTable(); renderDashboard();
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+let formChecklistData = {};
+const STATUSES_SHOW_DOCS = ['Documentação','Análise de Crédito','Aprovação','Contratação','Liberado','Concluído','Ajuizar Mandato'];
+
+function onStatusChange() {
+  const status = document.getElementById('p-status').value;
+  const wrap = document.getElementById('form-checklist-wrap');
+  if (!wrap) return;
+  if (STATUSES_SHOW_DOCS.includes(status)) {
+    wrap.style.display = '';
+    renderFormChecklist();
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function renderFormChecklist() {
+  const data = formChecklistData;
+  const allItems = CHECKLIST_DOCS.flatMap(g => g.items);
+  const total = allItems.length;
+  const nChecked = allItems.filter(i => data[i.key]).length;
+  const pct = total ? Math.round(nChecked / total * 100) : 0;
+  const bar = document.getElementById('form-cl-bar');
+  const pctEl = document.getElementById('form-cl-pct');
+  if (bar) { bar.style.width = pct + '%'; bar.style.background = pct === 100 ? 'var(--success)' : 'var(--primary-light)'; }
+  if (pctEl) { pctEl.textContent = nChecked + '/' + total + ' documentos'; pctEl.style.color = pct === 100 ? 'var(--success)' : 'var(--primary)'; }
+  const body = document.getElementById('form-checklist-body');
+  if (!body) return;
+  body.innerHTML = CHECKLIST_DOCS.map(g => `
+    <div style="margin-bottom:10px">
+      <div style="font-size:.75rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.3px;margin-bottom:5px">${g.group}</div>
+      ${g.items.map(item => `
+        <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:.875rem;border-bottom:1px solid var(--border)">
+          <input type="checkbox" ${data[item.key] ? 'checked' : ''} onchange="onFormChecklistChange('${item.key}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary)">
+          <span data-cl-key="${item.key}" style="${data[item.key] ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${item.label}</span>
+        </label>`).join('')}
+    </div>`).join('');
+}
+
+function onFormChecklistChange(key, checked) {
+  formChecklistData[key] = checked;
+  const allItems = CHECKLIST_DOCS.flatMap(g => g.items);
+  const total = allItems.length;
+  const nChecked = allItems.filter(i => formChecklistData[i.key]).length;
+  const pct = total ? Math.round(nChecked / total * 100) : 0;
+  const bar = document.getElementById('form-cl-bar');
+  const pctEl = document.getElementById('form-cl-pct');
+  if (bar) { bar.style.width = pct + '%'; bar.style.background = pct === 100 ? 'var(--success)' : 'var(--primary-light)'; }
+  if (pctEl) { pctEl.textContent = nChecked + '/' + total + ' documentos'; pctEl.style.color = pct === 100 ? 'var(--success)' : 'var(--primary)'; }
+  const span = document.querySelector(`span[data-cl-key="${key}"]`);
+  if (span) { span.style.textDecoration = checked ? 'line-through' : 'none'; span.style.color = checked ? 'var(--text-muted)' : ''; }
+}
+
+function printMissingDocs(clientName, checklistData) {
+  const data = checklistData || {};
+  const allItems = CHECKLIST_DOCS.flatMap(g => g.items);
+  const missing = allItems.filter(i => !data[i.key]);
+  const received = allItems.filter(i => data[i.key]);
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Documentos Pendentes - ${clientName}</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:40px;max-width:700px;margin:0 auto;color:#222}
+    h1{font-size:1.3rem;color:#1a56db;margin-bottom:4px}
+    .subtitle{font-size:.9rem;color:#555;margin-bottom:24px}
+    h2{font-size:.95rem;font-weight:700;margin:20px 0 8px;text-transform:uppercase;letter-spacing:.5px}
+    ul{list-style:none;padding:0;margin:0}
+    li{padding:7px 0;border-bottom:1px solid #eee;font-size:.9rem;display:flex;align-items:center;gap:8px}
+    li::before{font-size:1.1rem;flex-shrink:0}
+    .pending li::before{content:'☐';color:#c0392b}
+    .done li{color:#aaa;text-decoration:line-through}
+    .done li::before{content:'☑';color:#27ae60}
+    .none{color:#27ae60;font-weight:700;font-size:1rem;margin:12px 0}
+    .footer{margin-top:40px;padding-top:16px;border-top:1px solid #eee;font-size:.75rem;color:#999}
+    @media print{body{padding:20px}}
+  </style></head><body>
+  <h1>AGC Bitribut — Documentos Pendentes</h1>
+  <div class="subtitle"><strong>Cliente:</strong> ${clientName} &nbsp;·&nbsp; <strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</div>
+  ${missing.length > 0
+    ? `<h2>⚠️ Pendentes (${missing.length})</h2><ul class="pending">${missing.map(i => `<li>${i.label}</li>`).join('')}</ul>`
+    : `<p class="none">✅ Todos os documentos foram recebidos!</p>`}
+  ${received.length > 0
+    ? `<h2>✅ Recebidos (${received.length})</h2><ul class="done">${received.map(i => `<li>${i.label}</li>`).join('')}</ul>`
+    : ''}
+  <div class="footer">Gerado em ${new Date().toLocaleString('pt-BR')} · AGC Bitribut</div>
+  <script>window.onload=()=>window.print()<\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+function printMissingDocsFromForm() {
+  const clientName = document.getElementById('p-clientName').value.trim() || 'Cliente';
+  printMissingDocs(clientName, formChecklistData);
 }
 
 function renderChecklistHTML(p) {
@@ -1018,6 +1131,7 @@ async function viewProposta(id) {
   const canEdit = SESSION.user.role==='admin' || (SESSION.user.role!=='parceiro comercial' && p.createdBy===SESSION.user.id);
   document.getElementById('detalhe-edit-btn').style.display = canEdit ? '' : 'none';
   document.getElementById('detalhe-edit-btn').onclick = () => { closeModal('modal-detalhe'); editProposta(id); };
+  document.getElementById('detalhe-print-btn').onclick = () => printMissingDocs(p.clientName, p.checklistData || {});
   openModal('modal-detalhe');
   try {
     const hist = await API.get('/api/propostas/'+id+'/historico');
